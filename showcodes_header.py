@@ -1,10 +1,9 @@
 import random
-import numpy as np
 import qrcode
 import base64
 import matplotlib.pyplot as plt
 import math
-from tools import robust_soliton_distribution, choose_degree
+from tools import choose_degree
 
 MAX_QR_PAYLOAD_SIZE = 2210  # max payload size for a QR code
 

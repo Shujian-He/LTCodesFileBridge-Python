@@ -3,7 +3,6 @@ import math
 from PIL import Image
 import pyzbar.pyzbar as pyzbar
 from pyzbar.pyzbar import ZBarSymbol
-import glob
 
 def bitmask_to_indices(bitmask, K):
     """
@@ -19,23 +18,12 @@ def bitmask_to_indices(bitmask, K):
 def decode_packet_with_bitmask(encoded_str, K):
     """
     Given a Base64 encoded string, extract the bitmask and packet data.
-    Returns (K, indices, packet_data).
+    Returns (indices, packet).
     """
     combined = base64.b64decode(encoded_str)
-
-    # size_bit = combined[:3]
-    # size = int.from_bytes(size_bit, byteorder='big')
-
-    # K_bit = combined[3:3+2]
-    # K = int.from_bytes(K_bit, byteorder='big')
-
-    # num_bytes = math.ceil(K / 8) + 5
-    # bitmask = combined[5:num_bytes]
     num_bytes = math.ceil(K / 8)
     bitmask = combined[0:num_bytes]
-
     indices = bitmask_to_indices(bitmask, K)
-
     packet = combined[num_bytes:]
 
     return indices, packet
@@ -47,7 +35,7 @@ def decode_qr_code_pyzbar(qr_path):
     if not decoded_objects:
         return None
 
-    return decoded_objects[0].data  # read the first QR code content
+    return decoded_objects[0].data
 
 if __name__ == '__main__':
     header_str = decode_qr_code_pyzbar("f0.png").decode("utf-8")
