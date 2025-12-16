@@ -7,6 +7,7 @@ import base64
 import math
 import random
 import time
+import os
 from typing import Generator, Tuple, List
 
 # ---------------- Core logic ----------------
@@ -15,56 +16,107 @@ MAX_QR_PAYLOAD_SIZE = 2210  # bytes
 
 
 def robust_soliton_distribution(N, c=0.1, delta=0.5):
+    """
+    Computes the robust Soliton distribution for a block of N symbols using pure Python.
+    
+    Parameters:
+      N     : int   - total number of input symbols.
+      c     : float - constant parameter (tuning parameter for robustness).
+      delta : float - failure probability.
+      
+    Returns:
+      mu    : list  - a list of length N, where mu[d-1] is the probability
+                      for degree d (d = 1, 2, ..., N).
+    """
+    # Compute the ripple parameter R.
     R = c * math.log(N / delta) * math.sqrt(N)
-    tau = [0.0] * (N + 1)
-    for i in range(1, int(N / R)):
-        tau[i] = R / (i * N)
-    tau[int(N / R)] = R * math.log(R / delta) / N
-
-    rho = [0.0] * (N + 1)
-    rho[1] = 1 / N
-    for i in range(2, N + 1):
-        rho[i] = 1 / (i * (i - 1))
-
-    Z = sum(rho[1:]) + sum(tau[1:])
-    mu = [(rho[i] + tau[i]) / Z for i in range(N + 1)]
+    
+    # Determine the threshold K and ensure it does not exceed N.
+    K = int(math.floor(N / R))
+    K = min(K, N)  # Adjust K if necessary
+    
+    # Build the ideal Soliton distribution (rho):
+    # rho(1) = 1/N, and for d >= 2, rho(d) = 1/(d*(d-1)).
+    rho = [0] * N
+    rho[0] = 1.0 / N
+    for d in range(2, N + 1):
+        rho[d - 1] = 1.0 / (d * (d - 1))
+    
+    # Build the tau distribution (robustifying part).
+    tau = [0] * N
+    for d in range(1, K):
+        tau[d - 1] = R / (d * N)
+    if K <= N:
+        tau[K - 1] = R * math.log(R / delta) / N
+    
+    # Combine the two distributions.
+    combined = [r + t for r, t in zip(rho, tau)]
+    
+    # Normalize so that the probabilities sum to 1.
+    total = sum(combined)
+    mu = [x / total for x in combined]
+    
     return mu
 
-
-def sample_degree(mu):
-    r = random.random()
-    s = 0.0
-    for i in range(1, len(mu)):
-        s += mu[i]
-        if r <= s:
-            return i
-    return len(mu) - 1
+def choose_degree(K):
+    pdf = robust_soliton_distribution(K)
+    # Create a list of degrees [1, 2, ..., K]
+    degrees = list(range(1, K + 1))
+    # Use random.choices to select one degree according to the distribution pdf.
+    return random.choices(degrees, weights=pdf, k=1)[0]
 
 
-def fountain_encoder(data: bytes, chunk_size: int) -> Generator[Tuple[List[int], bytes], None, None]:
-    K = math.ceil(len(data) / chunk_size)
-    chunks = [data[i * chunk_size:(i + 1) * chunk_size] for i in range(K)]
-    mu = robust_soliton_distribution(K)
+def fountain_encoder(data: bytes, block_size: int) -> Generator[Tuple[List[int], bytes], None, None]:
+    K = math.ceil(len(data) / block_size) # small block size
+    blocks = [data[i * block_size:(i + 1) * block_size] for i in range(K)]
 
     while True:
-        d = sample_degree(mu)
+        d = choose_degree(K)
         indices = random.sample(range(K), d)
-        packet = bytearray(chunk_size)
-        for i in indices:
-            chunk = chunks[i]
-            for j in range(len(chunk)):
-                packet[j] ^= chunk[j]
-        yield indices, bytes(packet)
+        
+        # XOR the selected blocks
+        packet = blocks[indices[0]].ljust(block_size, b'\x00')
+        for idx in indices[1:]:
+            block = blocks[idx].ljust(block_size, b'\x00')
+            packet = bytes(a ^ b for a, b in zip(packet, block))
+        
+        yield indices, packet
 
 
-def encode_packet_with_bitmask(filesize, indices, packet, K):
-    bitmask = bytearray(math.ceil(K / 8))
-    for i in indices:
-        bitmask[i // 8] |= 1 << (i % 8)
+# alternative bitmask encoding (for reference)
+# def encode_packet_with_bitmask(filesize, indices, packet, K):
+#     bitmask = bytearray(math.ceil(K / 8))
+#     for i in indices:
+#         bitmask[i // 8] |= 1 << (i % 8)
+#     bitmask.reverse()
+#     payload = bytes(bitmask) + packet
+#     return base64.b64encode(payload).decode('utf-8')
 
-    header = filesize.to_bytes(4, 'big') + K.to_bytes(2, 'big')
-    payload = header + bytes(bitmask) + packet
-    return base64.b64encode(payload).decode()
+
+def indices_to_bitmask(indices, K):
+    """
+    Convert a list of indices into a bitmask of length K (packed into bytes).
+    Each bit corresponds to a block (0 means absent, 1 means present).
+    """
+    bitmask_int = 0
+    for idx in indices:
+        bitmask_int |= (1 << idx)
+    # Calculate number of bytes needed to store K bits.
+    num_bytes = math.ceil(K / 8)
+    return bitmask_int.to_bytes(num_bytes, byteorder='big')
+
+
+def encode_packet_with_bitmask(size, indices, packet, K):
+    """
+    Combine K, indices bitmask and the packet data.
+    Returns a Base64 string suitable for embedding in a QR code.
+    """
+    # size_bit = size.to_bytes(3, byteorder='big')
+    # K_bit = K.to_bytes(2, byteorder='big')
+    bitmask = indices_to_bitmask(indices, K)
+    print(' '.join(f'{byte:08b}' for byte in bitmask))
+    combined = bitmask + packet
+    return base64.b64encode(combined).decode('utf-8')
 
 
 def make_qr(data: str):
@@ -84,17 +136,34 @@ def make_qr(data: str):
 
 # ---------------- Gradio UI logic ----------------
 
+def prepare(file_path, block_size):
+    # --- MODIFIED: file handling ---
+    filename = os.path.basename(file_path)
 
-def prepare(file, chunk_size):
-    raw = file
+    with open(file_path, "rb") as f:
+        raw = f.read()
+
+    # --- MODIFIED: explicit protocol params ---
     filesize = len(raw)
-    K = math.ceil(filesize / chunk_size)
+    K = math.ceil(filesize / block_size)
 
-    header_payload = base64.b64encode(filesize.to_bytes(4, 'big') + K.to_bytes(2, 'big')).decode()
-    header_qr = make_qr(header_payload)
+    # --- MODIFIED: human-readable header ---
+    meta_str = f"HEADER:{filename}:{filesize}:{K}:{block_size}"
+    header_qr = make_qr(meta_str)
 
-    encoder = fountain_encoder(raw, chunk_size)
-    return header_qr, encoder, filesize, K
+    # --- MODIFIED: encoder uses raw bytes ---
+    encoder = fountain_encoder(raw, block_size)
+
+    # --- MODIFIED: return FULL state ---
+    state = {
+        "encoder": encoder,
+        "filesize": filesize,
+        "K": K,
+        "block_size": block_size,
+        "filename": filename,
+    }
+
+    return header_qr, state
 
 
 def stream_packets(state, running, rate):
@@ -102,10 +171,15 @@ def stream_packets(state, running, rate):
     if not running or state is None:
         return None
 
-    encoder, filesize, K = state
+    encoder = state["encoder"]
+    filesize = state["filesize"]
+    K = state["K"]
+    block_size = state["block_size"]
+
     update_interval = 1.0 / rate
 
     indices, packet = next(encoder)
+    print(indices)
     b64 = encode_packet_with_bitmask(filesize, indices, packet, K)
     qr_img = make_qr(b64)
     time.sleep(update_interval)
@@ -122,8 +196,8 @@ with gr.Blocks(title="LT Codes Generator", theme=gr.themes.Soft()) as demo:
 
     with gr.Row():
         with gr.Column(scale=1):
-            file_input = gr.File(label="Input File", type="binary")
-            chunk_size = gr.Slider(100, 1500, value=800, step=50, label="Chunk size (bytes)")
+            file_input = gr.File(label="Input File", type="filepath")
+            block_size = gr.Slider(100, 1500, value=800, step=50, label="Block size (bytes)")
             rate = gr.Slider(0.2, 5.0, value=1.0, step=0.2, label="QRs per second")
             start_btn = gr.Button("▶ Start", variant="primary")
             stop_btn = gr.Button("⏹ Stop", variant="secondary")
@@ -134,16 +208,16 @@ with gr.Blocks(title="LT Codes Generator", theme=gr.themes.Soft()) as demo:
     state = gr.State()
     running = gr.State(False)
 
-    def on_start(file, chunk_size, rate):
-        header, encoder, filesize, K = prepare(file, chunk_size)
-        return header, (encoder, filesize, K), True # [header_qr, state, running]
+    def on_start(file, block_size, rate):
+        header, state = prepare(file, block_size)
+        return header, state, True # [header_qr, state, running]
     
     def on_stop():
         return False, None, None # [running, header_qr, packet_qr]
 
     start_btn.click(
         fn=on_start,
-        inputs=[file_input, chunk_size, rate],
+        inputs=[file_input, block_size, rate],
         outputs=[header_qr, state, running],
     )
     stop_btn.click(
