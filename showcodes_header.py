@@ -51,20 +51,17 @@ def indices_to_bitmask(indices, K):
     Convert a list of indices into a bitmask of length K (packed into bytes).
     Each bit corresponds to a block (0 means absent, 1 means present).
     """
-    bitmask_int = 0
-    for idx in indices:
-        bitmask_int |= (1 << idx)
-    # Calculate number of bytes needed to store K bits.
-    num_bytes = math.ceil(K / 8)
-    return bitmask_int.to_bytes(num_bytes, byteorder='big')
+    bitmask = bytearray(math.ceil(K / 8))
+    for i in indices:
+        bitmask[i // 8] |= 1 << (i % 8)
+    bitmask.reverse()
+    return bytes(bitmask)
 
-def encode_packet_with_bitmask(size, indices, packet, K):
+def encode_packet_with_bitmask(indices, packet, K):
     """
-    Combine K, indices bitmask and the packet data.
+    Combine indices bitmask and the packet data.
     Returns a Base64 string suitable for embedding in a QR code.
     """
-    # size_bit = size.to_bytes(3, byteorder='big')
-    # K_bit = K.to_bytes(2, byteorder='big')
     bitmask = indices_to_bitmask(indices, K)
     print(' '.join(f'{byte:08b}' for byte in bitmask))
     combined = bitmask + packet
@@ -73,7 +70,7 @@ def encode_packet_with_bitmask(size, indices, packet, K):
 # --- Main Demonstration ---
 if __name__ == '__main__':
     pass
-    filename = "b.jpg"  # Change to your filename.
+    filename = "a.jpg"  # Change to your filename.
     with open(filename, "rb") as f:
         original_data = f.read()
     
@@ -106,7 +103,7 @@ if __name__ == '__main__':
         print("Packet indices:", indices)
         # Convert the binary packet data to Base64.
         # b64_data = base64.b64encode(packet).decode('utf-8')
-        b64_data = encode_packet_with_bitmask(filesize, indices, packet, K)
+        b64_data = encode_packet_with_bitmask(indices, packet, K)
         
         ax.clear()
         ax.imshow(create_qr(b64_data), cmap='gray')

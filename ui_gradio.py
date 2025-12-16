@@ -8,7 +8,6 @@ import math
 import random
 import time
 import os
-from typing import Generator, Tuple, List
 
 # ---------------- Core logic ----------------
 
@@ -66,7 +65,7 @@ def choose_degree(K):
     return random.choices(degrees, weights=pdf, k=1)[0]
 
 
-def fountain_encoder(data: bytes, block_size: int) -> Generator[Tuple[List[int], bytes], None, None]:
+def fountain_encoder(data: bytes, block_size: int):
     K = math.ceil(len(data) / block_size) # small block size
     blocks = [data[i * block_size:(i + 1) * block_size] for i in range(K)]
 
@@ -84,39 +83,13 @@ def fountain_encoder(data: bytes, block_size: int) -> Generator[Tuple[List[int],
 
 
 # alternative bitmask encoding (for reference)
-# def encode_packet_with_bitmask(filesize, indices, packet, K):
-#     bitmask = bytearray(math.ceil(K / 8))
-#     for i in indices:
-#         bitmask[i // 8] |= 1 << (i % 8)
-#     bitmask.reverse()
-#     payload = bytes(bitmask) + packet
-#     return base64.b64encode(payload).decode('utf-8')
-
-
-def indices_to_bitmask(indices, K):
-    """
-    Convert a list of indices into a bitmask of length K (packed into bytes).
-    Each bit corresponds to a block (0 means absent, 1 means present).
-    """
-    bitmask_int = 0
-    for idx in indices:
-        bitmask_int |= (1 << idx)
-    # Calculate number of bytes needed to store K bits.
-    num_bytes = math.ceil(K / 8)
-    return bitmask_int.to_bytes(num_bytes, byteorder='big')
-
-
-def encode_packet_with_bitmask(size, indices, packet, K):
-    """
-    Combine K, indices bitmask and the packet data.
-    Returns a Base64 string suitable for embedding in a QR code.
-    """
-    # size_bit = size.to_bytes(3, byteorder='big')
-    # K_bit = K.to_bytes(2, byteorder='big')
-    bitmask = indices_to_bitmask(indices, K)
-    print(' '.join(f'{byte:08b}' for byte in bitmask))
-    combined = bitmask + packet
-    return base64.b64encode(combined).decode('utf-8')
+def encode_packet_with_bitmask(indices, packet, K):
+    bitmask = bytearray(math.ceil(K / 8))
+    for i in indices:
+        bitmask[i // 8] |= 1 << (i % 8)
+    bitmask.reverse()
+    payload = bytes(bitmask) + packet
+    return base64.b64encode(payload).decode('utf-8')
 
 
 def make_qr(data: str):
@@ -180,7 +153,7 @@ def stream_packets(state, running, rate):
 
     indices, packet = next(encoder)
     print(indices)
-    b64 = encode_packet_with_bitmask(filesize, indices, packet, K)
+    b64 = encode_packet_with_bitmask(indices, packet, K)
     qr_img = make_qr(b64)
     time.sleep(update_interval)
     return qr_img
@@ -197,8 +170,8 @@ with gr.Blocks(title="LT Codes Generator", theme=gr.themes.Soft()) as demo:
     with gr.Row():
         with gr.Column(scale=1):
             file_input = gr.File(label="Input File", type="filepath")
-            block_size = gr.Slider(100, 1500, value=800, step=50, label="Block size (bytes)")
-            rate = gr.Slider(0.2, 5.0, value=1.0, step=0.2, label="QRs per second")
+            block_size = gr.Slider(100, 1500, value=1500, step=50, label="Block size (bytes)")
+            rate = gr.Slider(1.0, 5.0, value=5.0, step=1.0, label="QRs per second")
             start_btn = gr.Button("▶ Start", variant="primary")
             stop_btn = gr.Button("⏹ Stop", variant="secondary")
         with gr.Column(scale=1):

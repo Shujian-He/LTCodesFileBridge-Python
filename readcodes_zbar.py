@@ -4,15 +4,21 @@ from PIL import Image
 import pyzbar.pyzbar as pyzbar
 from pyzbar.pyzbar import ZBarSymbol
 
-def bitmask_to_indices(bitmask, K):
-    """
-    Convert the bitmask (as bytes) back into a list of indices.
-    """
-    bitmask_int = int.from_bytes(bitmask, byteorder='big')
+def bitmask_to_indices(bitmask: bytes, K: int) -> list[int]:
     indices = []
-    for idx in range(K):
-        if bitmask_int & (1 << idx):
-            indices.append(idx)
+    idx = 0
+
+    # big-endian bytes → least-significant byte first
+    for byte in reversed(bitmask):
+        for bit in range(8):
+            if idx >= K:
+                return indices
+
+            if byte & (1 << bit):
+                indices.append(idx)
+
+            idx += 1
+
     return indices
 
 def decode_packet_with_bitmask(encoded_str, K):
