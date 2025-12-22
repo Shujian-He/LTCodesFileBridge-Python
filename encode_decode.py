@@ -2,23 +2,7 @@ import random
 import math
 import random
 from collections import deque, defaultdict
-from tools import choose_degree
-
-def lt_encoder_infinite(file_data, block_size=1024):
-    K = math.ceil(len(file_data) / block_size)
-    # print("K", K)
-    blocks = [file_data[i * block_size:(i + 1) * block_size] for i in range(K)]
-    while True:
-        d = choose_degree(K)
-        indices = random.sample(range(K), d)
-        
-        # XOR the selected blocks
-        packet = blocks[indices[0]].ljust(block_size, b'\x00')
-        for idx in indices[1:]:
-            block = blocks[idx].ljust(block_size, b'\x00')
-            packet = bytes(a ^ b for a, b in zip(packet, block))
-        
-        yield (indices, packet), K
+from tools import infinite_lt_encoder
 
 def lt_decoder(recovered, packets, K):
 
@@ -99,7 +83,7 @@ if __name__ == '__main__':
     with open(filename, "rb") as f:
         original_data = f.read()
 
-    encoder_gen = lt_encoder_infinite(original_data, 2048)
+    encoder_gen = infinite_lt_encoder(original_data)
     encoded_packets = []
     count = 0
     recovered = {}

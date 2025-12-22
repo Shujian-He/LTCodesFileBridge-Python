@@ -1,5 +1,4 @@
 # Gradio-based UI
-# Focus: cleaner layout, better state handling, start/stop control, and stability
 
 import gradio as gr
 import qrcode
@@ -11,9 +10,10 @@ import os
 
 # ---------------- Core logic ----------------
 
-MAX_QR_PAYLOAD_SIZE = 2210  # bytes
+MAX_PAYLOAD_SIZE = 2212  # max payload size BEFORE base64 encoding, in bytes (base64 makes it 4/3 times larger)
 
 
+# Put it here to ensure single-file execution
 def robust_soliton_distribution(N, c=0.1, delta=0.5):
     """
     Computes the robust Soliton distribution for a block of N symbols using pure Python.
@@ -66,7 +66,7 @@ def choose_degree(K):
     return random.choices(degrees, weights=pdf, k=1)[0]
 
 
-def fountain_encoder(data: bytes, block_size: int):
+def lt_encoder(data: bytes, block_size: int):
     K = math.ceil(len(data) / block_size) # small block size
     blocks = [data[i * block_size:(i + 1) * block_size] for i in range(K)]
 
@@ -83,7 +83,6 @@ def fountain_encoder(data: bytes, block_size: int):
         yield indices, packet
 
 
-# alternative bitmask encoding (for reference)
 def encode_packet_with_bitmask(indices, packet, K):
     bitmask = bytearray(math.ceil(K / 8))
     for i in indices:
@@ -126,7 +125,7 @@ def prepare(file_path, block_size):
     header_qr = make_qr(meta_str)
 
     # --- MODIFIED: encoder uses raw bytes ---
-    encoder = fountain_encoder(raw, block_size)
+    encoder = lt_encoder(raw, block_size)
 
     # --- MODIFIED: return FULL state ---
     state = {

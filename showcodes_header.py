@@ -1,36 +1,8 @@
-import random
 import qrcode
 import base64
 import matplotlib.pyplot as plt
 import math
-from tools import choose_degree
-
-MAX_QR_PAYLOAD_SIZE = 2210  # max payload size for a QR code
-
-def cal_size(file_size, qr_size):
-    # Try different block sizes from (qr_size-1) down to 1
-    for block_size in reversed(range(1, qr_size)):
-        k = math.ceil(file_size / block_size)
-        k_to_bytes = math.ceil(k / 8)  # bytes needed to store bitmask for k blocks
-        # Condition: bitmask bytes + block size == qr_size.
-        if k_to_bytes + block_size == qr_size:
-            return k, block_size
-    return None
-
-def infinite_lt_encoder(file_data):
-    K, block_size = cal_size(len(file_data), MAX_QR_PAYLOAD_SIZE)
-    blocks = [file_data[i * block_size:(i + 1) * block_size] for i in range(K)]
-    while True:
-        d = choose_degree(K)
-        indices = random.sample(range(K), d)
-        
-        # XOR the selected blocks
-        packet = blocks[indices[0]].ljust(block_size, b'\x00')
-        for idx in indices[1:]:
-            block = blocks[idx].ljust(block_size, b'\x00')
-            packet = bytes(a ^ b for a, b in zip(packet, block))
-        
-        yield indices, packet
+from tools import cal_size, infinite_lt_encoder, MAX_PAYLOAD_SIZE
 
 # --- Helper: Show QR Code using plt ---
 def create_qr(data_str, version=40):
@@ -70,14 +42,15 @@ def encode_packet_with_bitmask(indices, packet, K):
 # --- Main Demonstration ---
 if __name__ == '__main__':
     pass
-    filename = "a.jpg"  # Change to your filename.
+    filename = "a.jpg"
     with open(filename, "rb") as f:
         original_data = f.read()
     
     filesize = len(original_data)
 
     # Compute K from the file data.
-    K, block_size = cal_size(filesize, MAX_QR_PAYLOAD_SIZE)
+    K, block_size = cal_size(filesize, MAX_PAYLOAD_SIZE)
+    print(f"K={K}, block_size={block_size}")
 
     print(f"Splitting file into {K} blocks")
     
@@ -98,12 +71,13 @@ if __name__ == '__main__':
     # Infinite loop: show each new packet as a QR code.
     while True:
     # for _ in range(1,2):
-        indices, packet = next(encoder_gen)
+        (indices, packet), _ = next(encoder_gen)
         # Optionally, print the indices to the console for debugging.
         print("Packet indices:", indices)
         # Convert the binary packet data to Base64.
         # b64_data = base64.b64encode(packet).decode('utf-8')
         b64_data = encode_packet_with_bitmask(indices, packet, K)
+        print(len(b64_data))
         
         ax.clear()
         ax.imshow(create_qr(b64_data), cmap='gray')

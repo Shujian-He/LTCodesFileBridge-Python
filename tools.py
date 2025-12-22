@@ -1,6 +1,9 @@
 import math
 import random
 
+MAX_PAYLOAD_SIZE = 2212  # max payload size BEFORE base64 encoding, in bytes (base64 makes it 4/3 times larger)
+MAX_FILE_SIZE = 9785888  # max file size we can handle, in bytes
+
 def robust_soliton_distribution(N, c=0.1, delta=0.5):
     """
     Computes the robust Soliton distribution for a block of N symbols using pure Python.
@@ -50,3 +53,28 @@ def choose_degree(K):
     degrees = list(range(1, K + 1))
     # Use random.choices to select one degree according to the distribution pdf.
     return random.choices(degrees, weights=pdf, k=1)[0]
+
+def cal_size(file_size, max_size):
+    # Try different block sizes from (max_size-1) down to 1
+    for block_size in reversed(range(1, max_size)):
+        k = math.ceil(file_size / block_size)
+        k_to_bytes = math.ceil(k / 8)  # bytes needed to store bitmask for k blocks
+        # Condition: bitmask bytes + block size == max_size.
+        if k_to_bytes + block_size == max_size:
+            return k, block_size
+    return None
+
+def infinite_lt_encoder(file_data):
+    K, block_size = cal_size(len(file_data), MAX_PAYLOAD_SIZE)
+    blocks = [file_data[i * block_size:(i + 1) * block_size] for i in range(K)]
+    while True:
+        d = choose_degree(K)
+        indices = random.sample(range(K), d)
+        
+        # XOR the selected blocks
+        packet = blocks[indices[0]].ljust(block_size, b'\x00')
+        for idx in indices[1:]:
+            block = blocks[idx].ljust(block_size, b'\x00')
+            packet = bytes(a ^ b for a, b in zip(packet, block))
+        
+        yield (indices, packet), K
