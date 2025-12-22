@@ -4,7 +4,7 @@ import random
 from collections import deque, defaultdict
 from tools import choose_degree
 
-def infinite_lt_encoder(file_data, block_size=1024):
+def lt_encoder_infinite(file_data, block_size=1024):
     K = math.ceil(len(file_data) / block_size)
     # print("K", K)
     blocks = [file_data[i * block_size:(i + 1) * block_size] for i in range(K)]
@@ -20,7 +20,25 @@ def infinite_lt_encoder(file_data, block_size=1024):
         
         yield (indices, packet), K
 
-def decode_lt(recovered, packets, K):
+def lt_decoder(recovered, packets, K):
+
+    # Construct a mapping from block indices to the set of packet indices that include them.
+    '''
+    EXAMPLE
+    before:
+        packets = [
+            [6, 11, 2],   # packet 0
+            [2],          # packet 1
+            [3, 6]        # packet 2
+        ]
+    after:
+        block_idx_to_packets = {
+            6:  {0, 2},
+            11: {0},
+            2:  {0, 1},
+            3:  {2}
+        }
+    '''
     block_idx_to_packets = defaultdict(set)
     for packet_idx, (indices, _) in enumerate(packets):
         for idx in indices:
@@ -81,7 +99,7 @@ if __name__ == '__main__':
     with open(filename, "rb") as f:
         original_data = f.read()
 
-    encoder_gen = infinite_lt_encoder(original_data, 2048)
+    encoder_gen = lt_encoder_infinite(original_data, 2048)
     encoded_packets = []
     count = 0
     recovered = {}
@@ -91,7 +109,7 @@ if __name__ == '__main__':
         packet, K = next(encoder_gen)
         # print(K)
         encoded_packets.append(packet)
-        decoded_data = decode_lt(recovered, encoded_packets, K)
+        decoded_data = lt_decoder(recovered, encoded_packets, K)
         if decoded_data:
             break
     
