@@ -57,6 +57,7 @@ def robust_soliton_distribution(N, c=0.1, delta=0.5):
     
     return mu
 
+
 def choose_degree(K):
     pdf = robust_soliton_distribution(K)
     # Create a list of degrees [1, 2, ..., K]
@@ -164,7 +165,7 @@ def stream_packets(state, running, rate):
 with gr.Blocks(title="LT Codes Generator", theme=gr.themes.Soft()) as demo:
     gr.Markdown("""
     # 📡 LT Codes Generator
-    Upload a file and continuously generate QR packets.
+    Upload a file and continuously generate LT codes packets via QR codes.
     """)
 
     with gr.Row():
