@@ -1,6 +1,6 @@
 import sys
 
-byte_count = 500000
+byte_count = 1000
 
 def generate_file(byte_count, filename="output.txt"):
     # The pattern used for each "byte"

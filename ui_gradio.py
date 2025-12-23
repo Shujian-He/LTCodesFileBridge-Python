@@ -10,8 +10,11 @@ import os
 
 # ---------------- Core logic ----------------
 
-MAX_PAYLOAD_SIZE = 2212  # max payload size BEFORE base64 encoding, in bytes (base64 makes it 4/3 times larger)
-
+MAX_PAYLOAD_SIZE = 2212  # max payload size BEFORE base64 encoding in bytes (base64 makes it 4/3 times larger)
+# 2212 * 4/3 = 2949.33 < 2953 (max QR code v40-L capacity), in practice, random 2212 bytes become 2952 bytes after base64 encoding
+MAX_FILE_SIZE = 9785888  # max file size we can handle in bytes
+# uses 1106 bytes to store 1106 * 8 = 8848 blocks' bitmask, leaving 2212 - 1106 = 1106 bytes for data
+# 1106 * 8848 = 9785888 bytes
 
 # Put it here to ensure single-file execution
 def robust_soliton_distribution(N, c=0.1, delta=0.5):
@@ -118,6 +121,9 @@ def prepare(file_path, block_size):
 
     # --- MODIFIED: explicit protocol params ---
     filesize = len(raw)
+    if filesize > MAX_FILE_SIZE:
+        raise gr.Error(f"File too large (max {MAX_FILE_SIZE} bytes)")
+
     K = math.ceil(filesize / block_size)
 
     # --- MODIFIED: human-readable header ---
@@ -187,6 +193,18 @@ with gr.Blocks(title="LT Codes Generator", theme=gr.themes.Soft()) as demo:
     
     def on_stop():
         return False, None, None # [running, header_qr, packet_qr]
+    
+    def check_file_size(file_path):
+        if file_path is None:
+            return
+        if os.path.getsize(file_path) > MAX_FILE_SIZE:
+            raise gr.Error(f"File too large (max {MAX_FILE_SIZE} bytes)")
+
+    file_input.change(
+        fn=check_file_size,
+        inputs=file_input,
+        outputs=None
+    )
 
     start_btn.click(
         fn=on_start,

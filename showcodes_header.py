@@ -42,7 +42,7 @@ def encode_packet_with_bitmask(indices, packet, K):
 # --- Main Demonstration ---
 if __name__ == '__main__':
     pass
-    filename = "a.jpg"
+    filename = "output.txt"
     with open(filename, "rb") as f:
         original_data = f.read()
     
