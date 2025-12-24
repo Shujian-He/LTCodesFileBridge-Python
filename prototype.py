@@ -18,11 +18,16 @@ if __name__ == '__main__':
         packet, K = next(encoder_gen)
         # print(K)
         encoded_packets.append(packet)
-        decoded_data = lt_decoder(recovered, encoded_packets, K)
-        if decoded_data:
+        recovered, encoded_packets = lt_decoder(encoded_packets)
+        if len(recovered) == K:
+            print("Decoding successful!")
             break
     
-    print(count)
+    # Reassemble the original data in order.
+    decoded_data = b''.join(recovered[i] for i in range(K))
+        # return decoded_data
+
+    print(f"{count} packets used." )
     
     if decoded_data:
         decoded_data = decoded_data[:len(original_data)]

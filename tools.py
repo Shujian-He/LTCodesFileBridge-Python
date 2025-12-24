@@ -85,7 +85,9 @@ def infinite_lt_encoder(file_data):
         
         yield (indices, packet), K
 
-def lt_decoder(recovered, packets, K):
+def lt_decoder(packets):
+    recovered = dict()  # block_idx -> packet data
+    packets = [list(p) for p in packets]
 
     # Construct a mapping from block indices to the set of packet indices that include them.
     '''
@@ -146,13 +148,4 @@ def lt_decoder(recovered, packets, K):
                     recovered[new_block_idx] = new_pkt
                     q.append(new_block_idx)
 
-    if len(recovered) != K:
-        print(f"Decoding failed: recovered {len(recovered)} blocks out of {K}")
-        print("Recovered:", list(recovered.keys()))
-        return None
-    else:
-        print("Decoding successful!")
-    
-    # Reassemble the original data in order.
-    decoded_data = b''.join(recovered[i] for i in range(K))
-    return decoded_data
+    return recovered, packets
