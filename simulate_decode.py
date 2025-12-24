@@ -19,7 +19,7 @@ def simulate_decode(packets):
         if len(indices) == 1:
             q.append(indices[0])
             
-    iteration = 1
+    iteration = 0
     
     while q:
         block = q.popleft()
