@@ -1,4 +1,4 @@
-# Gradio-based UI
+# Gradio-based UI for LT Codes Generator
 
 import gradio as gr
 import qrcode

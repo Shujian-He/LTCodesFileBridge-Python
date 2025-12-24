@@ -1,3 +1,5 @@
+# Show QR Codes with LT code packets (with header) using matplotlib
+
 import qrcode
 import base64
 import matplotlib.pyplot as plt

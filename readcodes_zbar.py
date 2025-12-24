@@ -1,3 +1,5 @@
+# Helpers to read QR codes using pyzbar and decode ONE LT code packet, for testing
+
 import base64
 import math
 from PIL import Image

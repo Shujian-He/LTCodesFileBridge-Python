@@ -1,4 +1,4 @@
-import sys
+#Generate a text file with a specified number of bytes
 
 byte_count = 1000
 

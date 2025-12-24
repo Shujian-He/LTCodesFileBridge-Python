@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+# Helper to simulate the LT code decoding process given a set of packets
 
 from collections import defaultdict, deque
 

@@ -1,5 +1,8 @@
+# Tool functions for LT codes encoding and decoding
+
 import math
 import random
+from collections import deque, defaultdict
 
 MAX_PAYLOAD_SIZE = 2212  # max payload size BEFORE base64 encoding in bytes (base64 makes it 4/3 times larger)
 # 2212 * 4/3 = 2949.33 < 2953 (max QR code v40-L capacity), in practice, random 2212 bytes become 2952 bytes after base64 encoding
@@ -81,3 +84,75 @@ def infinite_lt_encoder(file_data):
             packet = bytes(a ^ b for a, b in zip(packet, block))
         
         yield (indices, packet), K
+
+def lt_decoder(recovered, packets, K):
+
+    # Construct a mapping from block indices to the set of packet indices that include them.
+    '''
+    EXAMPLE
+    before:
+        packets = [
+            [6, 11, 2],   # packet 0
+            [2],          # packet 1
+            [3, 6]        # packet 2
+        ]
+    after:
+        block_idx_to_packets = {
+            6:  {0, 2},
+            11: {0},
+            2:  {0, 1},
+            3:  {2}
+        }
+    '''
+    block_idx_to_packets = defaultdict(set)
+    for packet_idx, (indices, _) in enumerate(packets):
+        for idx in indices:
+            block_idx_to_packets[idx].add(packet_idx)
+    
+    # Initialize a processing queue with packet indices that are immediately decodable.
+    # A packet is decodable if it involves exactly one block index.
+    q = deque()
+    for keys in recovered:
+        q.append(keys)
+    for indices, pkt in packets:
+        if len(indices) == 1:
+            block_idx = indices[0]
+            if block_idx not in recovered:
+                recovered[block_idx] = pkt
+                q.append(block_idx)
+    
+    # Process recovered blocks until the queue is empty.
+    while q:
+        recovered_block_idx = q.popleft()
+        rec_pkt = recovered[recovered_block_idx]
+        # Use a list() copy since we will modify the set during iteration.
+        for packet_idx in list(block_idx_to_packets[recovered_block_idx]):
+            indices, pkt = packets[packet_idx]
+            if recovered_block_idx not in indices:
+                continue  # It may have been updated already.
+            # Remove the recovered index from the packet's index list.
+            new_indices = [i for i in indices if i != recovered_block_idx]
+            # Update the packet by XOR-ing with the recovered block.
+            new_pkt = bytearray(a ^ b for a, b in zip(pkt, rec_pkt))
+            packets[packet_idx] = (new_indices, new_pkt)
+            
+            # Remove this packet from the mapping for the recovered index.
+            block_idx_to_packets[recovered_block_idx].remove(packet_idx)
+            
+            # If this update makes the packet decodable, add its block to recovered.
+            if len(new_indices) == 1:
+                new_block_idx = new_indices[0]
+                if new_block_idx not in recovered:
+                    recovered[new_block_idx] = new_pkt
+                    q.append(new_block_idx)
+
+    if len(recovered) != K:
+        print(f"Decoding failed: recovered {len(recovered)} blocks out of {K}")
+        print("Recovered:", list(recovered.keys()))
+        return None
+    else:
+        print("Decoding successful!")
+    
+    # Reassemble the original data in order.
+    decoded_data = b''.join(recovered[i] for i in range(K))
+    return decoded_data
