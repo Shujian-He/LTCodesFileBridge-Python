@@ -10,8 +10,8 @@ import os
 
 # ---------------- Core logic ----------------
 
-MAX_PAYLOAD_SIZE = 2212  # max payload size BEFORE base64 encoding in bytes (base64 makes it 4/3 times larger)
-# 2212 * 4/3 = 2949.33 < 2953 (max QR code v40-L capacity), in practice, random 2212 bytes become 2952 bytes after base64 encoding
+MAX_PAYLOAD_SIZE = 2210  # max payload size BEFORE base64 encoding in bytes (base64 makes it 4/3 times larger)
+# 2212 * 4/3 = 2949.33 < 2953 (max QR code v40-L capacity), in practice, random 2212 bytes become 2952 bytes after base64 encoding, use 2210 to be safe
 MAX_FILE_SIZE = 9785888  # max file size we can handle in bytes
 # uses 1106 bytes to store 1106 * 8 = 8848 blocks' bitmask, leaving 2212 - 1106 = 1106 bytes for data
 # 1106 * 8848 = 9785888 bytes
@@ -61,20 +61,38 @@ def robust_soliton_distribution(N, c=0.1, delta=0.5):
     return mu
 
 
-def choose_degree(K):
-    pdf = robust_soliton_distribution(K)
+def choose_degree(pdf, K):
     # Create a list of degrees [1, 2, ..., K]
     degrees = list(range(1, K + 1))
     # Use random.choices to select one degree according to the distribution pdf.
     return random.choices(degrees, weights=pdf, k=1)[0]
 
 
-def lt_encoder(data: bytes, block_size: int):
-    K = math.ceil(len(data) / block_size) # small block size
-    blocks = [data[i * block_size:(i + 1) * block_size] for i in range(K)]
+def validate_params(data_length: int, block_size: int):
+    if data_length > MAX_FILE_SIZE:
+        raise ValueError(f"File too large (max {MAX_FILE_SIZE} bytes)")
 
+    if block_size <= 0:
+        raise ValueError("block_size must be > 0")
+
+    K = math.ceil(data_length / block_size)
+    header_size = math.ceil(K / 8)
+
+    if header_size + block_size > MAX_PAYLOAD_SIZE:
+        raise ValueError(
+            f"Invalid LT params: K={K}, block_size={block_size}, "
+            f"payload={header_size + block_size} > {MAX_PAYLOAD_SIZE}"
+        )
+
+    return K
+
+
+def lt_encoder(data: bytes, block_size: int):
+    K = math.ceil(len(data) / block_size)
+    blocks = [data[i * block_size:(i + 1) * block_size] for i in range(K)]
+    pdf = robust_soliton_distribution(K)
     while True:
-        d = choose_degree(K)
+        d = choose_degree(pdf, K)
         indices = random.sample(range(K), d)
         
         # XOR the selected blocks
@@ -114,20 +132,18 @@ def make_qr(data: str):
 
 def prepare(file_path, block_size):
     # --- MODIFIED: file handling ---
-    filename = os.path.basename(file_path)
+    file_name = os.path.basename(file_path)
 
     with open(file_path, "rb") as f:
         raw = f.read()
 
     # --- MODIFIED: explicit protocol params ---
-    filesize = len(raw)
-    if filesize > MAX_FILE_SIZE:
-        raise gr.Error(f"File too large (max {MAX_FILE_SIZE} bytes)")
+    file_size = len(raw)
 
-    K = math.ceil(filesize / block_size)
+    K = validate_params(file_size, block_size)
 
     # --- MODIFIED: human-readable header ---
-    meta_str = f"HEADER:{filename}:{filesize}:{K}:{block_size}"
+    meta_str = f"HEADER:{file_name}:{file_size}:{K}:{block_size}"
     header_qr = make_qr(meta_str)
 
     # --- MODIFIED: encoder uses raw bytes ---
@@ -136,10 +152,10 @@ def prepare(file_path, block_size):
     # --- MODIFIED: return FULL state ---
     state = {
         "encoder": encoder,
-        "filesize": filesize,
+        "file_size": file_size,
         "K": K,
         "block_size": block_size,
-        "filename": filename,
+        "file_name": file_name,
     }
 
     return header_qr, state
@@ -148,16 +164,23 @@ def prepare(file_path, block_size):
 def stream_packets(state, running, rate):
     # Guard: stream_packets is called periodically even before Start is clicked
     if not running or state is None:
-        return None
+        return gr.update()
 
     encoder = state["encoder"]
-    filesize = state["filesize"]
+    file_size = state["file_size"]
     K = state["K"]
     block_size = state["block_size"]
 
     update_interval = 1.0 / rate
 
-    indices, packet = next(encoder)
+    try:
+        indices, packet = next(state["encoder"])
+    except StopIteration:
+        return gr.update(value=None)
+    except Exception as e:
+        print("stream_packets error:", e)
+        return gr.update(value=None)
+
     print(indices)
     b64 = encode_packet_with_bitmask(indices, packet, K)
     qr_img = make_qr(b64)
@@ -176,7 +199,7 @@ with gr.Blocks(title="LT Codes Generator", theme=gr.themes.Soft()) as demo:
     with gr.Row():
         with gr.Column(scale=1):
             file_input = gr.File(label="Input File", type="filepath")
-            block_size = gr.Slider(100, 1500, value=1500, step=50, label="Block size (bytes)")
+            block_size = gr.Slider(1, MAX_PAYLOAD_SIZE - 1, value=1500, step=1, label="Block size (bytes)")
             rate = gr.Slider(1.0, 5.0, value=5.0, step=1.0, label="QRs per second")
             start_btn = gr.Button("▶ Start", variant="primary")
             stop_btn = gr.Button("⏹ Stop", variant="secondary")
@@ -193,18 +216,6 @@ with gr.Blocks(title="LT Codes Generator", theme=gr.themes.Soft()) as demo:
     
     def on_stop():
         return False, None, None # [running, header_qr, packet_qr]
-    
-    def check_file_size(file_path):
-        if file_path is None:
-            return
-        if os.path.getsize(file_path) > MAX_FILE_SIZE:
-            raise gr.Error(f"File too large (max {MAX_FILE_SIZE} bytes)")
-
-    file_input.change(
-        fn=check_file_size,
-        inputs=file_input,
-        outputs=None
-    )
 
     start_btn.click(
         fn=on_start,

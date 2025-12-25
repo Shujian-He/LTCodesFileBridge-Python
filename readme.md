@@ -57,12 +57,16 @@ This launches a web interface where you can:
 
 ## Project Structure
 
-- `encode_decode.py`: Core LT encoding and decoding logic
-- `tools.py`: Robust Soliton distribution implementation
-- `ui_gradio.py`: Gradio web interface
-- `readcodes_zbar.py`: QR code reading functionality
-- `showcodes_header.py`: QR generation and display
-- `generate_txt.py`: Test file generation
+- **prototype.py**: Prototype implementation of LT codes algorithm
+- **readcodes_zbar.py**: Module for reading QR codes using the pyzbar library
+- **showcodes_header.py**: Script to generate and display header QR codes
+- **simulate_decode.py**: Simulation script for testing the decoding process
+- **generate_txt.py**: Script for generating sample text files for testing
+- **tools.py**: Utility functions and helper tools for the project
+- **ui_gradio.py**: Gradio-based web user interface for interactive file encoding/decoding
+- **readme.md**: This README file with project documentation
+- **requirements.txt**: List of Python dependencies required for the project
+- **LICENSE**: MIT License file
 
 ## Dependencies
 

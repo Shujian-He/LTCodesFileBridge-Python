@@ -4,8 +4,8 @@ import math
 import random
 from collections import deque, defaultdict
 
-MAX_PAYLOAD_SIZE = 2212  # max payload size BEFORE base64 encoding in bytes (base64 makes it 4/3 times larger)
-# 2212 * 4/3 = 2949.33 < 2953 (max QR code v40-L capacity), in practice, random 2212 bytes become 2952 bytes after base64 encoding
+MAX_PAYLOAD_SIZE = 2210  # max payload size BEFORE base64 encoding in bytes (base64 makes it 4/3 times larger)
+# 2212 * 4/3 = 2949.33 < 2953 (max QR code v40-L capacity), in practice, random 2212 bytes become 2952 bytes after base64 encoding, use 2210 to be safe
 MAX_FILE_SIZE = 9785888  # max file size we can handle in bytes
 # uses 1106 bytes to store 1106 * 8 = 8848 blocks' bitmask, leaving 2212 - 1106 = 1106 bytes for data
 # 1106 * 8848 = 9785888 bytes
@@ -53,8 +53,7 @@ def robust_soliton_distribution(N, c=0.1, delta=0.5):
     
     return mu
 
-def choose_degree(K):
-    pdf = robust_soliton_distribution(K)
+def choose_degree(pdf, K):
     # Create a list of degrees [1, 2, ..., K]
     degrees = list(range(1, K + 1))
     # Use random.choices to select one degree according to the distribution pdf.
@@ -73,8 +72,9 @@ def cal_size(file_size, max_size):
 def infinite_lt_encoder(file_data):
     K, block_size = cal_size(len(file_data), MAX_PAYLOAD_SIZE)
     blocks = [file_data[i * block_size:(i + 1) * block_size] for i in range(K)]
+    pdf = robust_soliton_distribution(K)
     while True:
-        d = choose_degree(K)
+        d = choose_degree(pdf, K)
         indices = random.sample(range(K), d)
         
         # XOR the selected blocks
@@ -86,8 +86,7 @@ def infinite_lt_encoder(file_data):
         yield (indices, packet), K
 
 def lt_decoder(packets):
-    recovered = dict()  # block_idx -> packet data
-    packets = [list(p) for p in packets]
+    recovered = dict()
 
     # Construct a mapping from block indices to the set of packet indices that include them.
     '''

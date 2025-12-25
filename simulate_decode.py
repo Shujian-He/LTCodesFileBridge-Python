@@ -3,7 +3,6 @@
 from collections import defaultdict, deque
 
 def simulate_decode(packets):
-    packets = [list(p) for p in packets]
     
     # block -> packets that reference it
     block_to_packets = defaultdict(set)
