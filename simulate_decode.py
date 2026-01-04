@@ -1,77 +1,97 @@
-# Helper to simulate the LT code decoding process given a set of packets
-
 from collections import defaultdict, deque
 
-def simulate_decode(packets):
-    
-    '''
-    EXAMPLE
-    before:
-        packets = [
-            [6, 11, 2],   # packet 0
-            [2],          # packet 1
-            [3, 6]        # packet 2
-        ]
-    after:
-        block_to_packets = {
-            6:  {0, 2},
-            11: {0},
-            2:  {0, 1},
-            3:  {2}
-        }
-    '''
+class IndexOnlyLTDecoder:
+    """
+    Incremental LT peeling simulator (index-only).
+    This simulates only the evolution of packet indices,
+    ignoring packet payloads entirely.
+    """
 
-    # block -> packets that reference it
-    block_to_packets = defaultdict(set)
-    for pkt_idx, indices in enumerate(packets):
-        for i in indices:
-            block_to_packets[i].add(pkt_idx)
-            
-    recovered = set()
-    q = deque()
-    
-    # Initialize queue with singleton packets
-    for pkt_idx, indices in enumerate(packets):
-        if len(indices) == 1:
-            q.append(indices[0])
-    
-    print("Initial queue:", [i for i in q])
-    iteration = 0
-    while q:
-        iteration += 1
-        print(f"Iteration {iteration}:")
-        print("Queue before popping:", [i for i in q])
-        block = q.popleft()
-        print(f"Popped block {block} from queue")
-        print("Queue after popping:", [i for i in q])
+    def __init__(self, k):
+        self.k = k # k: Number of blocks
+        self.recovered = set() # recovered input symbols
+        self.packets = list() # residual packets: list of index lists
+        self.block_to_packets = defaultdict(set) # {block : set of packet indices}
+        self.ripple = deque() # queue of newly recovered blocks
 
-        if block in recovered:
-            print(f"Skipped: Block {block} already peeled.")
-            continue
-        
-        print(f"Peeling block {block}")
-        recovered.add(block)
-        
-        for pkt_idx in list(block_to_packets[block]):
-            if block not in packets[pkt_idx]:
+    def add_packet(self, indices):
+        """
+        Add a new encoding symbol (index list only).
+        """
+        # Remove already recovered symbols
+        new_indices = [i for i in indices if i not in self.recovered]
+
+        if not new_indices:
+            return
+
+        packet_id = len(self.packets)
+        self.packets.append(new_indices)
+
+        for i in new_indices:
+            self.block_to_packets[i].add(packet_id)
+
+        # If singleton, release immediately
+        if len(new_indices) == 1:
+            self._add_to_ripple(new_indices[0])
+
+        self._peel()
+
+    def _add_to_ripple(self, block_idx):
+        if block_idx not in self.recovered:
+            self.ripple.append(block_idx)
+
+    def _peel(self):
+        """
+        Incremental peeling process (index-only).
+        """
+        while self.ripple:
+            b = self.ripple.popleft()
+            if b in self.recovered:
                 continue
-            
-            packets[pkt_idx].remove(block)
-            
-            if len(packets[pkt_idx]) == 1:
-                new_block = packets[pkt_idx][0]
-                print(f"    New singleton formed: {new_block}")
-                q.append(new_block)
-        
-        print("Queue after peeling:", [i for i in q])
-        print("Packets after peeling:")
-        for p in packets:
-            print(p)
-        
-    print(f"Recovered blocks: {sorted(recovered)}")
-    return recovered
 
-# Provided index lists (each list simulates the indices of a packet)
+            self.recovered.add(b)
+
+            for packet_id in list(self.block_to_packets[b]):
+                indices = self.packets[packet_id]
+                if b not in indices:
+                    continue
+
+                indices.remove(b)
+                self.block_to_packets[b].remove(packet_id)
+
+                if len(indices) == 1:
+                    self._add_to_ripple(indices[0])
+
+    def is_complete(self):
+        return len(self.recovered) == self.k
+    
+def simulate_index_only_decoding(packets, k):
+    decoder = IndexOnlyLTDecoder(k)
+
+    print("Starting incremental peeling simulation...\n")
+
+    for step, indices in enumerate(packets, 1):
+        print(f"--- Step {step}: adding packet {indices}")
+
+        print("Packets before peeling:")
+        for i, p in enumerate(decoder.packets):
+            print(f"  Packet {i}: {p}")
+        
+        decoder.add_packet(indices)
+
+        print("Packets after peeling:")
+        for i, p in enumerate(decoder.packets):
+            print(f"  Packet {i}: {p}")
+
+        print(f"Recovered so far: {sorted(decoder.recovered)}\n")
+
+        if decoder.is_complete():
+            print("All input symbols recovered.")
+            break
+
+    print("Final recovered set:", sorted(decoder.recovered))
+    return decoder.recovered
+
 packets = [
     [6, 11, 2, 12, 10],
     [3, 6, 2],
@@ -104,4 +124,6 @@ packets = [
     [0],
 ]
 
-simulate_decode(packets)
+k = 14   # input symbols are 0..13
+
+simulate_index_only_decoding(packets, k)

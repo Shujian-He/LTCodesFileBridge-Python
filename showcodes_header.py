@@ -4,7 +4,7 @@ import qrcode
 import base64
 import matplotlib.pyplot as plt
 import math
-from tools import cal_size, infinite_lt_encoder, MAX_PAYLOAD_SIZE
+from tools import cal_size, lt_encoder, MAX_PAYLOAD_SIZE
 
 # --- Helper: Show QR Code using plt ---
 def create_qr(data_str, version=40):
@@ -65,7 +65,7 @@ if __name__ == '__main__':
     plt.show()
     
     # 2. Now create an infinite generator of encoded packets.
-    encoder_gen = infinite_lt_encoder(original_data)
+    encoder_gen = lt_encoder(original_data)
     
     plt.ion()  # Enable interactive mode
     fig, ax = plt.subplots(figsize=(10, 8))

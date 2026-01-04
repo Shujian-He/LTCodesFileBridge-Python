@@ -69,7 +69,7 @@ def cal_size(file_size, max_size):
             return k, block_size
     return None
 
-def infinite_lt_encoder(file_data):
+def lt_encoder(file_data):
     K, block_size = cal_size(len(file_data), MAX_PAYLOAD_SIZE)
     blocks = [file_data[i * block_size:(i + 1) * block_size] for i in range(K)]
     pdf = robust_soliton_distribution(K)
@@ -85,66 +85,110 @@ def infinite_lt_encoder(file_data):
         
         yield (indices, packet), K
 
-def lt_decoder(packets):
-    recovered = dict()
+class LTDecoder:
+    """
+    Incremental peeling decoder for LT Codes.
+    This decoder maintains a residual bipartite graph and performs
+    event-driven peeling as new encoding symbols arrive.
+    """
 
-    # Construct a mapping from block indices to the set of packet indices that include them.
-    '''
-    EXAMPLE
-    before:
-        packets = [
-            [6, 11, 2],   # packet 0
-            [2],          # packet 1
-            [3, 6]        # packet 2
-        ]
-    after:
-        block_idx_to_packets = {
-            6:  {0, 2},
-            11: {0},
-            2:  {0, 1},
-            3:  {2}
-        }
-    '''
-    block_idx_to_packets = defaultdict(set)
-    for packet_idx, (indices, _) in enumerate(packets):
-        for idx in indices:
-            block_idx_to_packets[idx].add(packet_idx)
-    
-    # Initialize a processing queue with packet indices that are immediately decodable.
-    # A packet is decodable if it involves exactly one block index.
-    q = deque()
-    for keys in recovered:
-        q.append(keys)
-    for indices, pkt in packets:
-        if len(indices) == 1:
-            block_idx = indices[0]
-            if block_idx not in recovered:
-                recovered[block_idx] = pkt
-                q.append(block_idx)
-    
-    # Process recovered blocks until the queue is empty.
-    while q:
-        recovered_block_idx = q.popleft()
-        rec_pkt = recovered[recovered_block_idx]
-        # Use a list() copy since we will modify the set during iteration.
-        for packet_idx in list(block_idx_to_packets[recovered_block_idx]):
-            indices, pkt = packets[packet_idx]
-            if recovered_block_idx not in indices:
-                continue  # It may have been updated already.
-            # Remove the recovered index from the packet's index list.
-            new_indices = [i for i in indices if i != recovered_block_idx]
-            # Update the packet by XOR-ing with the recovered block.
-            new_pkt = bytearray(a ^ b for a, b in zip(pkt, rec_pkt))
-            packets[packet_idx] = (new_indices, new_pkt)
-            
-            # Remove this packet from the mapping for the recovered index.
-            block_idx_to_packets[recovered_block_idx].remove(packet_idx)
-            
-            # If this update makes the packet decodable, add its block to recovered.
-            if len(new_indices) == 1:
-                new_block_idx = new_indices[0]
-                if new_block_idx not in recovered:
-                    recovered[new_block_idx] = new_pkt
-                    q.append(new_block_idx)
+    def __init__(self, k):
+        """
+        GRAPH EXAMPLE
+        before:
+            packets = [
+                [6, 11, 2],   # packet 0
+                [2],          # packet 1
+                [3, 6]        # packet 2
+            ]
+        after:
+            block_to_packets = {
+                6:  {0, 2},
+                11: {0},
+                2:  {0, 1},
+                3:  {2}
+            }
+        """
+        self.k = k # k: Number of blocks
+        self.recovered = defaultdict(set) # {block_idx : bytes} (immutable recovered symbols)
+        self.packets = list() # residual packets: [[[indices], bytearray(data)], ...]
+        self.block_to_packets = defaultdict(set) # {block : set of packet indices}
+        self.ripple = deque() # queue of newly recovered blocks
 
-    return recovered, packets
+    def add_packet(self, indices, pkt):
+        """
+        Add a newly received encoding symbol and trigger incremental peeling.
+
+        :param indices: list of block indices participating in this packet
+        :param pkt: XOR-ed payload of the selected blocks
+        """
+        # Residual packet must be mutable
+        pkt = bytearray(pkt)
+
+        # Step 1: Eliminate already recovered blocks
+        new_indices = []
+        for i in indices:
+            if i in self.recovered:
+                rec = self.recovered[i]
+                pkt[:] = (a ^ b for a, b in zip(pkt, rec))
+            else:
+                new_indices.append(i)
+
+        # If no unknown symbols remain, this packet carries no new information
+        if not new_indices:
+            return
+
+        packet_id = len(self.packets)
+        self.packets.append([new_indices, pkt])
+
+        # Update adjacency structure
+        for i in new_indices:
+            self.block_to_packets[i].add(packet_id)
+
+        # Step 2: If degree is 1, release a new block
+        if len(new_indices) == 1:
+            self._add_to_ripple(new_indices[0], pkt)
+
+        # Step 3: Run the LT peeling process
+        self._peel()
+
+    def _add_to_ripple(self, block_idx, pkt):
+        """
+        Add a newly recovered block to the ripple.
+        The recovered symbol must be immutable.
+        """
+        if block_idx not in self.recovered:
+            # IMPORTANT: freeze the recovered symbol (no shared mutable buffer)
+            self.recovered[block_idx] = bytes(pkt)
+            self.ripple.append(block_idx)
+
+    def _peel(self):
+        """
+        Perform the LT peeling process (incremental decoding).
+        """
+        while self.ripple:
+            b = self.ripple.popleft()
+            rec_pkt = self.recovered[b]
+
+            # Process all encoding symbols that involve block b
+            for packet_id in list(self.block_to_packets[b]):
+                indices, pkt = self.packets[packet_id]
+                if b not in indices:
+                    continue
+
+                # Remove b from this encoding symbol
+                indices.remove(b)
+                pkt[:] = (a ^ c for a, c in zip(pkt, rec_pkt))
+                self.block_to_packets[b].remove(packet_id)
+
+                # If degree drops to 1, release a new block
+                if len(indices) == 1:
+                    new_b = indices[0]
+                    self._add_to_ripple(new_b, pkt)
+
+    def is_complete(self):
+        """
+        Check whether all k blocks have been recovered.
+        """
+        return len(self.recovered) == self.k
+    
