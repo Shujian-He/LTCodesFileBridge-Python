@@ -4,6 +4,23 @@ from collections import defaultdict, deque
 
 def simulate_decode(packets):
     
+    '''
+    EXAMPLE
+    before:
+        packets = [
+            [6, 11, 2],   # packet 0
+            [2],          # packet 1
+            [3, 6]        # packet 2
+        ]
+    after:
+        block_to_packets = {
+            6:  {0, 2},
+            11: {0},
+            2:  {0, 1},
+            3:  {2}
+        }
+    '''
+
     # block -> packets that reference it
     block_to_packets = defaultdict(set)
     for pkt_idx, indices in enumerate(packets):
@@ -17,19 +34,22 @@ def simulate_decode(packets):
     for pkt_idx, indices in enumerate(packets):
         if len(indices) == 1:
             q.append(indices[0])
-            
-    iteration = 0
     
+    print("Initial queue:", [i for i in q])
+    iteration = 0
     while q:
-        block = q.popleft()
-
         iteration += 1
+        print(f"Iteration {iteration}:")
+        print("Queue before popping:", [i for i in q])
+        block = q.popleft()
+        print(f"Popped block {block} from queue")
+        print("Queue after popping:", [i for i in q])
 
         if block in recovered:
-            print(f"Iteration {iteration} skipped: Block {block} already recovered.")
+            print(f"Skipped: Block {block} already peeled.")
             continue
         
-        print(f"Iteration {iteration}: recovering block {block}")
+        print(f"Peeling block {block}")
         recovered.add(block)
         
         for pkt_idx in list(block_to_packets[block]):
@@ -42,7 +62,8 @@ def simulate_decode(packets):
                 new_block = packets[pkt_idx][0]
                 print(f"    New singleton formed: {new_block}")
                 q.append(new_block)
-                
+        
+        print("Queue after peeling:", [i for i in q])
         print("Packets after peeling:")
         for p in packets:
             print(p)
