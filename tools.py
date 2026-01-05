@@ -10,80 +10,155 @@ MAX_FILE_SIZE = 9785888  # max file size we can handle in bytes
 # uses 1106 bytes to store 1106 * 8 = 8848 blocks' bitmask, leaving 2212 - 1106 = 1106 bytes for data
 # 1106 * 8848 = 9785888 bytes
 
-def robust_soliton_distribution(N, c=0.1, delta=0.5):
+def robust_soliton_distribution(k, c=0.1, delta=0.5):
     """
-    Computes the robust Soliton distribution for a block of N symbols using pure Python.
-    
-    Parameters:
-      N     : int   - total number of input symbols.
-      c     : float - constant parameter (tuning parameter for robustness).
-      delta : float - failure probability.
-      
-    Returns:
-      mu    : list  - a list of length N, where mu[d-1] is the probability
-                      for degree d (d = 1, 2, ..., N).
+    Compute the Robust Soliton Distribution as defined in:
+    M. Luby, "LT Codes", The 43rd Annual IEEE Symposium on Foundations
+    of Computer Science (FOCS), 2002.
+
+    Parameters
+    ----------
+    k : int
+        Number of input symbols (file blocks).
+    c : float
+        Positive constant controlling the average ripple size.
+    delta : float
+        Failure probability parameter (0 < delta < 1).
+
+    Returns
+    -------
+    mu : list of float
+        Probability mass function mu(d) for degrees d = 1, 2, ..., k.
+        mu[d-1] corresponds to degree d.
     """
-    # Compute the ripple parameter R.
-    R = c * math.log(N / delta) * math.sqrt(N)
-    
-    # Determine the threshold K and ensure it does not exceed N.
-    K = int(math.floor(N / R))
-    K = min(K, N)  # Adjust K if necessary
-    
-    # Build the ideal Soliton distribution (rho):
-    # rho(1) = 1/N, and for d >= 2, rho(d) = 1/(d*(d-1)).
-    rho = [0] * N
-    rho[0] = 1.0 / N
-    for d in range(2, N + 1):
+
+    # ------------------------------------------------------------
+    # Step 1: Compute the ripple parameter R
+    #
+    #   R = c * ln(k / delta) * sqrt(k)
+    #
+    # This parameter controls the expected ripple size.
+    # ------------------------------------------------------------
+    R = c * math.log(k / delta) * math.sqrt(k)
+
+    # ------------------------------------------------------------
+    # Step 2: Compute the cutoff parameter K
+    #
+    #   K = floor(k / R)
+    #
+    # This determines where the robustifying distribution tau(d)
+    # concentrates its mass.
+    # ------------------------------------------------------------
+    K = int(math.floor(k / R))
+    K = min(K, k)
+
+    # ------------------------------------------------------------
+    # Step 3: Ideal Soliton Distribution rho(d)
+    #
+    #   rho(1) = 1 / k
+    #   rho(d) = 1 / [d * (d - 1)],   for d = 2, ..., k
+    # ------------------------------------------------------------
+    rho = [0.0] * k
+    rho[0] = 1.0 / k
+    for d in range(2, k + 1):
         rho[d - 1] = 1.0 / (d * (d - 1))
-    
-    # Build the tau distribution (robustifying part).
-    tau = [0] * N
+
+    # ------------------------------------------------------------
+    # Step 4: Robustifying distribution tau(d)
+    #
+    #   tau(d) = R / (d * k),                 for 1 <= d <= K - 1
+    #   tau(K) = R * ln(R / delta) / k
+    #   tau(d) = 0,                           for d > K
+    # ------------------------------------------------------------
+    tau = [0.0] * k
     for d in range(1, K):
-        tau[d - 1] = R / (d * N)
-    if K <= N:
-        tau[K - 1] = R * math.log(R / delta) / N
-    
-    # Combine the two distributions.
+        tau[d - 1] = R / (d * k)
+
+    if K >= 1 and K <= k:
+        tau[K - 1] = R * math.log(R / delta) / k
+
+    # ------------------------------------------------------------
+    # Step 5: Combine and normalize
+    #
+    #   mu(d) = (rho(d) + tau(d)) / Z
+    #
+    # where Z is the normalization constant.
+    # ------------------------------------------------------------
     combined = [r + t for r, t in zip(rho, tau)]
-    
-    # Normalize so that the probabilities sum to 1.
-    total = sum(combined)
-    mu = [x / total for x in combined]
-    
+    Z = sum(combined)
+    mu = [x / Z for x in combined]
+
     return mu
 
-def choose_degree(pdf, K):
-    # Create a list of degrees [1, 2, ..., K]
-    degrees = list(range(1, K + 1))
-    # Use random.choices to select one degree according to the distribution pdf.
-    return random.choices(degrees, weights=pdf, k=1)[0]
 
-def cal_size(file_size, max_size):
-    # Try different block sizes from (max_size-1) down to 1
-    for block_size in reversed(range(1, max_size)):
+def choose_degree(mu):
+    """
+    Sample a degree according to the Robust Soliton distribution.
+
+    Parameters
+    ----------
+    mu : list of float
+        Degree distribution for d = 1, 2, ..., k.
+
+    Returns
+    -------
+    d : int
+        Sampled degree.
+    """
+
+    return random.choices(
+        population=range(1, len(mu) + 1),
+        weights=mu,
+        k=1
+    )[0]
+
+def choose_block_size(file_size, max_payload_size):
+    """
+    Choose the largest possible block size such that:
+        ceil(k / 8) + block_size <= max_payload_size
+
+    where:
+        k = ceil(file_size / block_size)
+
+    The bitmask is stored in front of the payload.
+    """
+
+    for block_size in range(max_payload_size - 1, 0, -1):
         k = math.ceil(file_size / block_size)
-        k_to_bytes = math.ceil(k / 8)  # bytes needed to store bitmask for k blocks
-        # Condition: bitmask bytes + block size == max_size.
-        if k_to_bytes + block_size == max_size:
+        bitmask_bytes = math.ceil(k / 8)
+
+        if bitmask_bytes + block_size <= max_payload_size:
             return k, block_size
-    return None
+
+    raise ValueError("Cannot find a valid block size")
 
 def lt_encoder(file_data):
-    K, block_size = cal_size(len(file_data), MAX_PAYLOAD_SIZE)
-    blocks = [file_data[i * block_size:(i + 1) * block_size] for i in range(K)]
-    pdf = robust_soliton_distribution(K)
+    """
+    LT Encoder generator function.
+    The value k is computed once and yielded with every packet
+    for convenience, but must be treated as a constant.
+    """
+    k, block_size = choose_block_size(len(file_data), MAX_PAYLOAD_SIZE)
+
+    blocks = [
+        file_data[i * block_size:(i + 1) * block_size]
+        for i in range(k)
+    ]
+
+    mu = robust_soliton_distribution(k)
+
     while True:
-        d = choose_degree(pdf, K)
-        indices = random.sample(range(K), d)
-        
-        # XOR the selected blocks
-        packet = blocks[indices[0]].ljust(block_size, b'\x00')
+        d = choose_degree(mu)
+        indices = random.sample(range(k), d)
+
+        packet = bytearray(blocks[indices[0]].ljust(block_size, b'\x00'))
         for idx in indices[1:]:
             block = blocks[idx].ljust(block_size, b'\x00')
-            packet = bytes(a ^ b for a, b in zip(packet, block))
-        
-        yield (indices, packet), K
+            for i in range(block_size):
+                packet[i] ^= block[i]
+
+        # k is constant across all yields
+        yield (indices, bytes(packet)), k
 
 class LTDecoder:
     """

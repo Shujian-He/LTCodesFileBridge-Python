@@ -4,7 +4,7 @@ import qrcode
 import base64
 import matplotlib.pyplot as plt
 import math
-from tools import cal_size, lt_encoder, MAX_PAYLOAD_SIZE
+from tools import choose_block_size, lt_encoder, MAX_PAYLOAD_SIZE
 
 # --- Helper: Show QR Code using plt ---
 def create_qr(data_str, version=40):
@@ -51,7 +51,7 @@ if __name__ == '__main__':
     filesize = len(original_data)
 
     # Compute K from the file data.
-    K, block_size = cal_size(filesize, MAX_PAYLOAD_SIZE)
+    K, block_size = choose_block_size(filesize, MAX_PAYLOAD_SIZE)
     print(f"K={K}, block_size={block_size}")
 
     print(f"Splitting file into {K} blocks")
