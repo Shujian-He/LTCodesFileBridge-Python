@@ -1,3 +1,22 @@
+"""
+LT Codes Decoding Simulation
+
+This module provides a simulation of the LT codes decoding process.
+It implements an index-only version of the incremental peeling algorithm, which simulates
+the recovery of input symbols from encoded packets without handling actual payload data.
+
+The simulation demonstrates how LT codes work by tracking which input symbols are covered
+by each packet and how the peeling process gradually recovers all original symbols through
+iterative elimination of singleton packets.
+
+Classes:
+    IndexOnlyLTDecoder: Simulates the LT decoding process using only packet indices.
+
+Functions:
+    simulate_index_only_decoding: Runs the simulation with a list of packets and prints
+                                  the step-by-step decoding process.
+"""
+
 from collections import defaultdict, deque
 
 class IndexOnlyLTDecoder:
@@ -133,6 +152,6 @@ packets = [[7, 10, 1],
  [0, 12, 5, 4, 7, 6, 10, 9, 2, 13, 1],
  [7, 9, 11, 3, 6, 4, 12]]
 
-k = 14   # input symbols are 0..13
+num_blocks = 14   # input symbols are 0..13
 
-simulate_index_only_decoding(packets, k)
+simulate_index_only_decoding(packets, num_blocks)

@@ -20,23 +20,24 @@ def create_qr(data_str, version=40):
 
     return img
 
-def indices_to_bitmask(indices, K):
+def indices_to_bitmask(indices, num_blocks):
     """
-    Convert a list of indices into a bitmask of length K (packed into bytes).
+    Convert a list of indices into a bitmask of length num_blocks / 8.
     Each bit corresponds to a block (0 means absent, 1 means present).
+    Big-endian byte order.
     """
-    bitmask = bytearray(math.ceil(K / 8))
+    bitmask = bytearray(math.ceil(num_blocks / 8))
     for i in indices:
         bitmask[i // 8] |= 1 << (i % 8)
     bitmask.reverse()
     return bytes(bitmask)
 
-def encode_packet_with_bitmask(indices, packet, K):
+def encode_packet_with_bitmask(indices, packet, num_blocks):
     """
     Combine indices bitmask and the packet data.
     Returns a Base64 string suitable for embedding in a QR code.
     """
-    bitmask = indices_to_bitmask(indices, K)
+    bitmask = indices_to_bitmask(indices, num_blocks)
     print(' '.join(f'{byte:08b}' for byte in bitmask))
     combined = bitmask + packet
     return base64.b64encode(combined).decode('utf-8')
@@ -50,15 +51,15 @@ if __name__ == '__main__':
     
     filesize = len(original_data)
 
-    # Compute K from the file data.
-    K, block_size = choose_block_size(filesize, MAX_PAYLOAD_SIZE)
-    print(f"K={K}, block_size={block_size}")
+    # Compute num_blocks from the file data.
+    num_blocks, block_size = choose_block_size(filesize, MAX_PAYLOAD_SIZE)
+    print(f"num_blocks={num_blocks}, block_size={block_size}")
 
-    print(f"Splitting file into {K} blocks")
+    print(f"Splitting file into {num_blocks} blocks")
     
-    meta_str = f"HEADER:{filename}:{filesize}:{K}:{block_size}"
+    meta_str = f"HEADER:{filename}:{filesize}:{num_blocks}:{block_size}"
 
-    # 1. Show a QR code that only contains K.
+    # 1. Show header QR code.
     plt.figure("Initial Image", figsize=(10, 8))
     plt.imshow(create_qr(meta_str, version=1), cmap='gray')
     plt.axis('off')
@@ -78,7 +79,7 @@ if __name__ == '__main__':
         print("Packet indices:", indices)
         # Convert the binary packet data to Base64.
         # b64_data = base64.b64encode(packet).decode('utf-8')
-        b64_data = encode_packet_with_bitmask(indices, packet, K)
+        b64_data = encode_packet_with_bitmask(indices, packet, num_blocks)
         print(len(b64_data))
         
         ax.clear()

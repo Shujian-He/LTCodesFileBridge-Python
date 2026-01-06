@@ -1,4 +1,27 @@
-# Tool functions for LT codes encoding and decoding
+"""
+LT Codes Implementation Tools
+
+This module provides the core implementation of LT codes encoding and decoding.
+
+Key Features:
+- Robust Soliton Distribution for optimal degree selection
+- LT Encoder for generating encoded packets from file data
+- LT Decoder with incremental peeling algorithm for recovery
+- Automatic block size optimization for QR code payload constraints
+
+Constants:
+    MAX_PAYLOAD_SIZE: Maximum payload size before base64 encoding
+    MAX_FILE_SIZE: Maximum file size that can be handled
+
+Functions:
+    robust_soliton_distribution: Computes the Robust Soliton degree distribution
+    choose_degree: Samples a degree according to the distribution
+    choose_block_size: Optimizes block size for given file and payload constraints
+    lt_encoder: Generator function that produces LT encoded packets
+
+Classes:
+    LTDecoder: Incremental peeling decoder for recovering original data
+"""
 
 import math
 import random
@@ -124,11 +147,11 @@ def choose_block_size(file_size, max_payload_size):
     """
 
     for block_size in range(max_payload_size - 1, 0, -1):
-        k = math.ceil(file_size / block_size)
-        bitmask_bytes = math.ceil(k / 8)
+        num_blocks = math.ceil(file_size / block_size)
+        bitmask_bytes = math.ceil(num_blocks / 8)
 
         if bitmask_bytes + block_size <= max_payload_size:
-            return k, block_size
+            return num_blocks, block_size
 
     raise ValueError("Cannot find a valid block size")
 
@@ -138,18 +161,18 @@ def lt_encoder(file_data):
     The value k is computed once and yielded with every packet
     for convenience, but must be treated as a constant.
     """
-    k, block_size = choose_block_size(len(file_data), MAX_PAYLOAD_SIZE)
+    num_blocks, block_size = choose_block_size(len(file_data), MAX_PAYLOAD_SIZE)
 
     blocks = [
         file_data[i * block_size:(i + 1) * block_size]
-        for i in range(k)
+        for i in range(num_blocks)
     ]
 
-    mu = robust_soliton_distribution(k)
+    mu = robust_soliton_distribution(num_blocks)
 
     while True:
         d = choose_degree(mu)
-        indices = random.sample(range(k), d)
+        indices = random.sample(range(num_blocks), d)
 
         packet = bytearray(blocks[indices[0]].ljust(block_size, b'\x00'))
         for idx in indices[1:]:
@@ -158,7 +181,7 @@ def lt_encoder(file_data):
                 packet[i] ^= block[i]
 
         # k is constant across all yields
-        yield (indices, bytes(packet)), k
+        yield (indices, bytes(packet)), num_blocks
 
 class LTDecoder:
     """
@@ -167,7 +190,7 @@ class LTDecoder:
     event-driven peeling as new encoding symbols arrive.
     """
 
-    def __init__(self, k):
+    def __init__(self, num_blocks):
         """
         GRAPH EXAMPLE
         before:
@@ -184,7 +207,7 @@ class LTDecoder:
                 3:  {2}
             }
         """
-        self.k = k # k: Number of blocks
+        self.num_blocks = num_blocks # number of blocks
         self.recovered = defaultdict(set) # {block_idx : bytes} (immutable recovered symbols)
         self.packets = list() # residual packets: [[[indices], bytearray(data)], ...]
         self.block_to_packets = defaultdict(set) # {block : set of packet indices}
@@ -265,5 +288,5 @@ class LTDecoder:
         """
         Check whether all k blocks have been recovered.
         """
-        return len(self.recovered) == self.k
+        return len(self.recovered) == self.num_blocks
     
