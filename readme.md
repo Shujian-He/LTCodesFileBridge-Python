@@ -26,11 +26,11 @@ A Python implementation of LT Codes for reliable file transmission over QR codes
 
 ## Usage
 
-### Gradio UI (Recommended)
+### Encoder using Gradio UI (Recommended)
 
 Run the Gradio-based interface:
 ```bash
-python ui_gradio.py
+gradio ui_gradio.py
 ```
 
 This launches a web interface where you can:
@@ -38,6 +38,10 @@ This launches a web interface where you can:
 - Adjust chunk size and QR generation rate
 - Generate and display header and packet QR codes
 - Start/Stop the streaming process
+
+### Decoder using SwiftUI (Seperate Repository)
+
+Refer to the [LTCodesFileBridge-SwiftUI](https://github.com/shujian-he/LTCodesFileBridge-SwiftUI)
 
 ## How It Works
 
@@ -58,12 +62,12 @@ This launches a web interface where you can:
 ## Project Structure
 
 - **prototype.py**: Prototype implementation of LT codes algorithm
-- **readcodes_zbar.py**: Module for reading QR codes using the pyzbar library
-- **showcodes_header.py**: Script to generate and display header QR codes
-- **simulate_decode.py**: Simulation script for testing the decoding process
-- **generate_txt.py**: Script for generating sample text files for testing
+- **read_codes.py**: Module for reading and decoding encoded QR codes
+- **show_codes.py**: Module for generating and displaying encoded QR codes
+- **simulate_decode.py**: Module for simulating the decoding process
+- **generate_txt.py**: Module for generating sample text files for testing
 - **tools.py**: Utility functions and helper tools for the project
-- **ui_gradio.py**: Gradio-based web user interface for interactive file encoding/decoding
+- **ui_gradio.py**: Gradio-based web user interface for interactive file encoding
 - **readme.md**: This README file with project documentation
 - **requirements.txt**: List of Python dependencies required for the project
 - **LICENSE**: MIT License file
@@ -73,7 +77,7 @@ This launches a web interface where you can:
 - Pillow: Image processing
 - pyzbar: QR code decoding
 - qrcode: QR code generation
-- matplotlib: Plotting (for demos)
+- matplotlib: QR code plotting
 - gradio: Web UI framework
 
 ## License
