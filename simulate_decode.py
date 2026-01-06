@@ -5,10 +5,6 @@ This module provides a simulation of the LT codes decoding process.
 It implements an index-only version of the incremental peeling algorithm, which simulates
 the recovery of input symbols from encoded packets without handling actual payload data.
 
-The simulation demonstrates how LT codes work by tracking which input symbols are covered
-by each packet and how the peeling process gradually recovers all original symbols through
-iterative elimination of singleton packets.
-
 Classes:
     IndexOnlyLTDecoder: Simulates the LT decoding process using only packet indices.
 

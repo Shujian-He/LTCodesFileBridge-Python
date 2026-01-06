@@ -1,8 +1,8 @@
 """
 LT Codes Prototype Demonstration
 
-This script demonstrates the complete LT codes encoding and decoding
-workflow. It reads a file, encodes it into LT packets using the Robust Soliton Distribution,
+This module demonstrates the complete LT codes encoding and decoding workflow. 
+It reads a file, encodes it into LT packets using the Robust Soliton Distribution,
 then decodes the packets back to recover the original file, and verifies correctness.
 
 The prototype shows:
@@ -10,9 +10,6 @@ The prototype shows:
 2. Incremental decoding using the LTDecoder class
 3. Packet-by-packet recovery until all blocks are decoded
 4. Verification that the decoded data matches the original
-
-This serves as a proof-of-concept for the LT codes implementation and can be used
-as a reference for integrating LT coding into larger applications.
 """
 
 from tools import lt_encoder, LTDecoder

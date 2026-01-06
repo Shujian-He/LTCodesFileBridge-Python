@@ -1,4 +1,22 @@
-# Show QR Codes with LT code packets (with header) using matplotlib
+"""
+QR Code Display for LT Codes Packets
+
+This module demonstrates the visualization of LT codes encoded as QR codes. 
+It generates and displays QR codes containing:
+
+1. A header QR code with file metadata (filename, size, block count, block size)
+2. Sequential QR codes for each LT encoded packet, showing the bitmask and payload
+
+Each packet QR code contains:
+- A bitmask indicating which input blocks are XORed together
+- The XORed payload data
+- Base64 encoding for QR code compatibility
+
+Functions:
+    create_qr: Generates a QR code image from string data
+    indices_to_bitmask: Converts block indices to a compact bitmask
+    encode_packet_with_bitmask: Combines bitmask and payload into base64 string
+"""
 
 import qrcode
 import base64
@@ -6,7 +24,6 @@ import matplotlib.pyplot as plt
 import math
 from tools import choose_block_size, lt_encoder, MAX_PAYLOAD_SIZE
 
-# --- Helper: Show QR Code using plt ---
 def create_qr(data_str, version=40):
     qr = qrcode.QRCode(
         version=version,  # Adjust if needed.

@@ -7,9 +7,6 @@ The module includes functions to:
 - Convert bitmasks to block indices
 - Decode LT packets from base64 encoded strings
 - Process a sequence of QR codes to reconstruct the original file
-
-When run as a main script, it reads QR codes from the 'qrcodes' directory,
-decodes the LT packets, and writes the recovered file to the 'output' directory.
 """
 
 import base64
