@@ -23,6 +23,7 @@ if __name__ == '__main__':
     encoder_gen = lt_encoder(original_data)
 
     (indices, pkt), num_blocks = next(encoder_gen)
+    print(f"num_blocks = {num_blocks}")
 
     decoder = LTDecoder(num_blocks)
     decoder.add_packet(indices, pkt)

@@ -22,8 +22,8 @@ class IndexOnlyLTDecoder:
     ignoring packet payloads entirely.
     """
 
-    def __init__(self, k):
-        self.k = k # k: Number of blocks
+    def __init__(self, num_blocks):
+        self.num_blocks = num_blocks # num_blocks: Number of blocks
         self.recovered = set() # recovered input symbols
         self.packets = list() # residual packets: list of index lists
         self.block_to_packets = defaultdict(set) # {block : set of packet indices}
@@ -78,10 +78,10 @@ class IndexOnlyLTDecoder:
                     self._add_to_ripple(indices[0])
 
     def is_complete(self):
-        return len(self.recovered) == self.k
+        return len(self.recovered) == self.num_blocks
     
-def simulate_index_only_decoding(packets, k):
-    decoder = IndexOnlyLTDecoder(k)
+def simulate_index_only_decoding(packets, num_blocks):
+    decoder = IndexOnlyLTDecoder(num_blocks)
 
     print("Starting incremental peeling simulation...\n")
 
@@ -91,7 +91,7 @@ def simulate_index_only_decoding(packets, k):
         print("Packets before adding and peeling:")
         for i, p in enumerate(decoder.packets):
             print(f"  Packet {i}: {p}")
-        
+
         decoder.add_packet(indices)
 
         print("Packets after adding and peeling:")

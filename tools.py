@@ -180,7 +180,7 @@ def lt_encoder(file_data):
             for i in range(block_size):
                 packet[i] ^= block[i]
 
-        # k is constant across all yields
+        # num_blocks is constant across all yields
         yield (indices, bytes(packet)), num_blocks
 
 class LTDecoder:
@@ -208,9 +208,9 @@ class LTDecoder:
             }
         """
         self.num_blocks = num_blocks # number of blocks
-        self.recovered = defaultdict(set) # {block_idx : bytes} (immutable recovered symbols)
+        self.recovered = defaultdict(set) # {block_idx : data bytes} (immutable recovered symbols)
         self.packets = list() # residual packets: [[[indices], bytearray(data)], ...]
-        self.block_to_packets = defaultdict(set) # {block : set of packet indices}
+        self.block_to_packets = defaultdict(set) # {block_idx : set of packet indices}
         self.ripple = deque() # queue of newly recovered blocks
 
     def add_packet(self, indices, pkt):
@@ -236,7 +236,7 @@ class LTDecoder:
         if not new_indices:
             return
 
-        packet_id = len(self.packets)
+        packet_id = len(self.packets) # new packet index
         self.packets.append([new_indices, pkt])
 
         # Update adjacency structure
