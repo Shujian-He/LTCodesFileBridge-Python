@@ -25,8 +25,11 @@ import math
 from tools import choose_block_size, lt_encoder, MAX_PAYLOAD_SIZE
 
 def create_qr(data_str, version=40):
+    """
+    Create a QR code image from the given data string.
+    """
     qr = qrcode.QRCode(
-        version=version,  # Adjust if needed.
+        version=version,
         error_correction=qrcode.constants.ERROR_CORRECT_L,
         box_size=10,
         border=4
@@ -40,8 +43,7 @@ def create_qr(data_str, version=40):
 def indices_to_bitmask(indices, num_blocks):
     """
     Convert a list of indices into a bitmask of length num_blocks / 8.
-    Each bit corresponds to a block (0 means absent, 1 means present).
-    Big-endian byte order.
+    Use big-endian byte order for better human readability.
     """
     bitmask = bytearray(math.ceil(num_blocks / 8))
     for i in indices:

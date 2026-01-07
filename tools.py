@@ -158,7 +158,7 @@ def choose_block_size(file_size, max_payload_size):
 def lt_encoder(file_data):
     """
     LT Encoder generator function.
-    The value k is computed once and yielded with every packet
+    The value num_blocks is computed once and yielded with every packet
     for convenience, but must be treated as a constant.
     """
     num_blocks, block_size = choose_block_size(len(file_data), MAX_PAYLOAD_SIZE)
@@ -177,11 +177,10 @@ def lt_encoder(file_data):
         packet = bytearray(blocks[indices[0]].ljust(block_size, b'\x00'))
         for idx in indices[1:]:
             block = blocks[idx].ljust(block_size, b'\x00')
-            for i in range(block_size):
-                packet[i] ^= block[i]
+            packet = bytes(a ^ b for a, b in zip(packet, block))
 
         # num_blocks is constant across all yields
-        yield (indices, bytes(packet)), num_blocks
+        yield (indices, packet), num_blocks
 
 class LTDecoder:
     """

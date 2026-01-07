@@ -16,56 +16,108 @@ MAX_FILE_SIZE = 9785888  # max file size we can handle in bytes
 # uses 1106 bytes to store 1106 * 8 = 8848 blocks' bitmask, leaving 2212 - 1106 = 1106 bytes for data
 # 1106 * 8848 = 9785888 bytes
 
-# Put it here to ensure single-file execution
-def robust_soliton_distribution(N, c=0.1, delta=0.5):
+# Put every useful function here to ensure single-file execution
+def robust_soliton_distribution(k, c=0.1, delta=0.5):
     """
-    Computes the robust Soliton distribution for a block of N symbols using pure Python.
-    
-    Parameters:
-      N     : int   - total number of input symbols.
-      c     : float - constant parameter (tuning parameter for robustness).
-      delta : float - failure probability.
-      
-    Returns:
-      mu    : list  - a list of length N, where mu[d-1] is the probability
-                      for degree d (d = 1, 2, ..., N).
+    Compute the Robust Soliton Distribution as defined in:
+    M. Luby, "LT Codes", The 43rd Annual IEEE Symposium on Foundations
+    of Computer Science (FOCS), 2002.
+
+    Parameters
+    ----------
+    k : int
+        Number of input symbols (file blocks).
+    c : float
+        Positive constant controlling the average ripple size.
+    delta : float
+        Failure probability parameter (0 < delta < 1).
+
+    Returns
+    -------
+    mu : list of float
+        Probability mass function mu(d) for degrees d = 1, 2, ..., k.
+        mu[d-1] corresponds to degree d.
     """
-    # Compute the ripple parameter R.
-    R = c * math.log(N / delta) * math.sqrt(N)
-    
-    # Determine the threshold K and ensure it does not exceed N.
-    K = int(math.floor(N / R))
-    K = min(K, N)  # Adjust K if necessary
-    
-    # Build the ideal Soliton distribution (rho):
-    # rho(1) = 1/N, and for d >= 2, rho(d) = 1/(d*(d-1)).
-    rho = [0] * N
-    rho[0] = 1.0 / N
-    for d in range(2, N + 1):
+
+    # ------------------------------------------------------------
+    # Step 1: Compute the ripple parameter R
+    #
+    #   R = c * ln(k / delta) * sqrt(k)
+    #
+    # This parameter controls the expected ripple size.
+    # ------------------------------------------------------------
+    R = c * math.log(k / delta) * math.sqrt(k)
+
+    # ------------------------------------------------------------
+    # Step 2: Compute the cutoff parameter K
+    #
+    #   K = floor(k / R)
+    #
+    # This determines where the robustifying distribution tau(d)
+    # concentrates its mass.
+    # ------------------------------------------------------------
+    K = int(math.floor(k / R))
+    K = min(K, k)
+
+    # ------------------------------------------------------------
+    # Step 3: Ideal Soliton Distribution rho(d)
+    #
+    #   rho(1) = 1 / k
+    #   rho(d) = 1 / [d * (d - 1)],   for d = 2, ..., k
+    # ------------------------------------------------------------
+    rho = [0.0] * k
+    rho[0] = 1.0 / k
+    for d in range(2, k + 1):
         rho[d - 1] = 1.0 / (d * (d - 1))
-    
-    # Build the tau distribution (robustifying part).
-    tau = [0] * N
+
+    # ------------------------------------------------------------
+    # Step 4: Robustifying distribution tau(d)
+    #
+    #   tau(d) = R / (d * k),                 for 1 <= d <= K - 1
+    #   tau(K) = R * ln(R / delta) / k
+    #   tau(d) = 0,                           for d > K
+    # ------------------------------------------------------------
+    tau = [0.0] * k
     for d in range(1, K):
-        tau[d - 1] = R / (d * N)
-    if K <= N:
-        tau[K - 1] = R * math.log(R / delta) / N
-    
-    # Combine the two distributions.
+        tau[d - 1] = R / (d * k)
+
+    if K >= 1 and K <= k:
+        tau[K - 1] = R * math.log(R / delta) / k
+
+    # ------------------------------------------------------------
+    # Step 5: Combine and normalize
+    #
+    #   mu(d) = (rho(d) + tau(d)) / Z
+    #
+    # where Z is the normalization constant.
+    # ------------------------------------------------------------
     combined = [r + t for r, t in zip(rho, tau)]
-    
-    # Normalize so that the probabilities sum to 1.
-    total = sum(combined)
-    mu = [x / total for x in combined]
-    
+    Z = sum(combined)
+    mu = [x / Z for x in combined]
+
     return mu
 
 
-def choose_degree(pdf, K):
-    # Create a list of degrees [1, 2, ..., K]
-    degrees = list(range(1, K + 1))
-    # Use random.choices to select one degree according to the distribution pdf.
-    return random.choices(degrees, weights=pdf, k=1)[0]
+def choose_degree(mu):
+    """
+    Sample a degree according to the Robust Soliton distribution.
+
+    Parameters
+    ----------
+    mu : list of float
+        Degree distribution for d = 1, 2, ..., k.
+
+    Returns
+    -------
+    d : int
+        Sampled degree.
+    """
+
+    return random.choices(
+        population=range(1, len(mu) + 1),
+        weights=mu,
+        k=1
+    )[0]
 
 
 def validate_params(data_length: int, block_size: int):
@@ -75,28 +127,32 @@ def validate_params(data_length: int, block_size: int):
     if block_size <= 0:
         raise ValueError("block_size must be > 0")
 
-    K = math.ceil(data_length / block_size)
-    header_size = math.ceil(K / 8)
+    num_blocks = math.ceil(data_length / block_size)
+    header_size = math.ceil(num_blocks / 8)
 
     if header_size + block_size > MAX_PAYLOAD_SIZE:
         raise ValueError(
-            f"Invalid LT params: K={K}, block_size={block_size}, "
+            f"Invalid LT params: num_blocks={num_blocks}, block_size={block_size}, "
             f"payload={header_size + block_size} > {MAX_PAYLOAD_SIZE}"
         )
 
-    return K
+    return num_blocks
 
 
-def lt_encoder(data: bytes, block_size: int):
-    K = math.ceil(len(data) / block_size)
-    blocks = [data[i * block_size:(i + 1) * block_size] for i in range(K)]
-    pdf = robust_soliton_distribution(K)
+def lt_encoder_web(data: bytes, block_size: int):
+    """
+    LT Encoder generator function for web UI.
+    """
+    num_blocks = math.ceil(len(data) / block_size)
+    blocks = [data[i * block_size:(i + 1) * block_size] for i in range(num_blocks)]
+
+    mu = robust_soliton_distribution(num_blocks)
+
     while True:
-        d = choose_degree(pdf, K)
-        indices = random.sample(range(K), d)
+        d = choose_degree(mu)
+        indices = random.sample(range(num_blocks), d)
         
-        # XOR the selected blocks
-        packet = blocks[indices[0]].ljust(block_size, b'\x00')
+        packet = bytearray(blocks[indices[0]].ljust(block_size, b'\x00'))
         for idx in indices[1:]:
             block = blocks[idx].ljust(block_size, b'\x00')
             packet = bytes(a ^ b for a, b in zip(packet, block))
@@ -104,8 +160,14 @@ def lt_encoder(data: bytes, block_size: int):
         yield indices, packet
 
 
-def encode_packet_with_bitmask(indices, packet, K):
-    bitmask = bytearray(math.ceil(K / 8))
+def encode_packet_with_bitmask_web(indices, packet, num_blocks):
+    """
+    Convert a list of indices into a bitmask of length num_blocks / 8.
+    Use big-endian byte order for better human readability.
+    Then combine the bitmask and the packet data.
+    Returns a Base64 string suitable for embedding in a QR code.
+    """
+    bitmask = bytearray(math.ceil(num_blocks / 8))
     for i in indices:
         bitmask[i // 8] |= 1 << (i % 8)
     bitmask.reverse()
@@ -113,7 +175,10 @@ def encode_packet_with_bitmask(indices, packet, K):
     return base64.b64encode(payload).decode('utf-8')
 
 
-def make_qr(data: str):
+def create_qr_web(data: str):
+    """
+    Create a QR code image from the given data string.
+    """
     qr = qrcode.QRCode(
         version=None,
         error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -140,20 +205,20 @@ def prepare(file_path, block_size):
     # --- MODIFIED: explicit protocol params ---
     file_size = len(raw)
 
-    K = validate_params(file_size, block_size)
+    num_blocks = validate_params(file_size, block_size)
 
     # --- MODIFIED: human-readable header ---
-    meta_str = f"HEADER:{file_name}:{file_size}:{K}:{block_size}"
-    header_qr = make_qr(meta_str)
+    meta_str = f"HEADER:{file_name}:{file_size}:{num_blocks}:{block_size}"
+    header_qr = create_qr_web(meta_str)
 
     # --- MODIFIED: encoder uses raw bytes ---
-    encoder = lt_encoder(raw, block_size)
+    encoder = lt_encoder_web(raw, block_size)
 
     # --- MODIFIED: return FULL state ---
     state = {
         "encoder": encoder,
         "file_size": file_size,
-        "K": K,
+        "num_blocks": num_blocks,
         "block_size": block_size,
         "file_name": file_name,
     }
@@ -167,14 +232,14 @@ def stream_packets(state, running, rate):
         return gr.update()
 
     encoder = state["encoder"]
-    file_size = state["file_size"]
-    K = state["K"]
-    block_size = state["block_size"]
+    # file_size = state["file_size"]
+    num_blocks = state["num_blocks"]
+    # block_size = state["block_size"]
 
     update_interval = 1.0 / rate
 
     try:
-        indices, packet = next(state["encoder"])
+        indices, packet = next(encoder)
     except StopIteration:
         return gr.update(value=None)
     except Exception as e:
@@ -182,8 +247,8 @@ def stream_packets(state, running, rate):
         return gr.update(value=None)
 
     print(indices)
-    b64 = encode_packet_with_bitmask(indices, packet, K)
-    qr_img = make_qr(b64)
+    b64 = encode_packet_with_bitmask_web(indices, packet, num_blocks)
+    qr_img = create_qr_web(b64)
     time.sleep(update_interval)
     return qr_img
 
