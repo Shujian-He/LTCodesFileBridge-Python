@@ -17,22 +17,27 @@ import math
 
 if __name__ == '__main__':
 
+    # Read original file
     file_name = "output.txt"
     with open(file_name, "rb") as f:
         original_data = f.read()
 
+    # Determine block size and number of blocks
     block_size = choose_block_size(len(original_data), MAX_PAYLOAD_SIZE)
     num_blocks = math.ceil(len(original_data) / block_size)
     print(f"num_blocks = {num_blocks}")
     
+    # Initialize LT encoder and generate first packet
     encoder_gen = lt_encoder(original_data, block_size)
     indices, pkt = next(encoder_gen)
 
+    # Initialize LT decoder and add first packet
     decoder = LTDecoder(num_blocks)
     decoder.add_packet(indices, pkt)
 
     count = 1
 
+    # Continue adding packets until decoding is complete
     while not decoder.is_complete():
         indices, pkt = next(encoder_gen)
         decoder.add_packet(indices, pkt)
@@ -41,11 +46,12 @@ if __name__ == '__main__':
     print("Decoding successful!")
     print(f"{count} packets used.")
 
+    # Verify recovered data matches original
     decoded_data = b''.join(decoder.recovered[i] for i in range(num_blocks))
     decoded_data = decoded_data[:len(original_data)]
 
+    # Write recovered file for inspection
     with open(f"output/{file_name}", "wb") as f:
         f.write(decoded_data)
-
 
     assert decoded_data == original_data

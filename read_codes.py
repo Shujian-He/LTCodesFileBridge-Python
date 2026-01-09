@@ -17,7 +17,7 @@ import pyzbar.pyzbar as pyzbar
 from pyzbar.pyzbar import ZBarSymbol
 from tools import LTDecoder
 
-def decode_qr_code_pyzbar(qr_path: str) -> bytes | None:
+def decode_qr_code_pyzbar(qr_path: str):
     """
     Decode a single QR code image and return raw bytes.
     """
@@ -30,7 +30,7 @@ def decode_qr_code_pyzbar(qr_path: str) -> bytes | None:
     return decoded_objects[0].data
 
 
-def bitmask_to_indices(bitmask: bytes, num_blocks: int) -> list[int]:
+def bitmask_to_indices(bitmask: bytes, num_blocks: int):
     """
     Convert a bitmask (big-endian byte order) into block indices.
     """
