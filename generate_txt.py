@@ -1,8 +1,6 @@
 # Generate a text file with a specified number of bytes
 
-byte_count = 1000
-
-def generate_file(byte_count, filename="output.txt"):
+def generate_file(byte_count = 1000, filename="output.txt"):
     # The pattern used for each "byte"
     pattern = "abcdefg "  # 8 bytes in ASCII encoding
     # Repeat the pattern enough times and slice to match byte_count
@@ -12,5 +10,5 @@ def generate_file(byte_count, filename="output.txt"):
         file.write(content)
     print(f"Generated file '{filename}' with {byte_count} bytes.")
 
-
-generate_file(byte_count)
+if __name__ == '__main__':
+    generate_file()
