@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 import math
 from tools import choose_block_size, lt_encoder, MAX_PAYLOAD_SIZE
 
-def create_qr(data_str, version=40):
+def create_qr(data_str: str, version=40):
     """
     Create a QR code image from the given data string.
     """
@@ -40,7 +40,7 @@ def create_qr(data_str, version=40):
 
     return img
 
-def indices_to_bitmask(indices, num_blocks):
+def indices_to_bitmask(indices: list, num_blocks: int):
     """
     Convert a list of indices into a bitmask of length num_blocks / 8.
     Use big-endian byte order for better human readability.
@@ -51,7 +51,7 @@ def indices_to_bitmask(indices, num_blocks):
     bitmask.reverse()
     return bytes(bitmask)
 
-def encode_packet_with_bitmask(indices, packet, num_blocks):
+def encode_packet_with_bitmask(indices: list, packet: bytes, num_blocks: int):
     """
     Combine indices bitmask and the packet data.
     Returns a Base64 string suitable for embedding in a QR code.

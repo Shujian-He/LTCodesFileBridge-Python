@@ -1,6 +1,6 @@
 # LTCodesFileBridge-Python
 
-A Python implementation of LT Codes for reliable file transmission over QR codes. This project allows you to encode files into a stream of QR codes using fountain codes, which can be scanned and decoded even if some packets are lost or corrupted.
+A Python implementation of LT Codes for reliable file transmission over QR codes. This project allows you to encode files into a stream of QR codes, which can be scanned and decoded using a decoder app even if some packets are lost or corrupted.
 
 ## Features
 

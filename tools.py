@@ -33,7 +33,7 @@ MAX_FILE_SIZE = 9785888  # max file size we can handle in bytes
 # uses 1106 bytes to store 1106 * 8 = 8848 blocks' bitmask, leaving 2212 - 1106 = 1106 bytes for data
 # 1106 * 8848 = 9785888 bytes
 
-def robust_soliton_distribution(k, c=0.1, delta=0.5):
+def robust_soliton_distribution(k: int, c: float = 0.1, delta: float = 0.5):
     """
     Compute the Robust Soliton Distribution as defined in:
     M. Luby, "LT Codes", The 43rd Annual IEEE Symposium on Foundations
@@ -114,7 +114,7 @@ def robust_soliton_distribution(k, c=0.1, delta=0.5):
     return mu
 
 
-def choose_degree(mu):
+def choose_degree(mu: list):
     """
     Sample a degree according to the Robust Soliton distribution.
 
@@ -135,13 +135,13 @@ def choose_degree(mu):
         k=1
     )[0]
 
-def choose_block_size(file_size, max_payload_size):
+def choose_block_size(file_size: int, max_payload_size: int):
     """
     Choose the largest possible block size such that:
-        ceil(k / 8) + block_size <= max_payload_size
+        ceil(num_blocks / 8) + block_size <= max_payload_size
 
     where:
-        k = ceil(file_size / block_size)
+        num_blocks = ceil(file_size / block_size)
 
     The bitmask is stored in front of the payload.
     """
@@ -151,17 +151,17 @@ def choose_block_size(file_size, max_payload_size):
         bitmask_bytes = math.ceil(num_blocks / 8)
 
         if bitmask_bytes + block_size <= max_payload_size:
-            return num_blocks, block_size
+            return block_size
 
     raise ValueError("Cannot find a valid block size")
 
-def lt_encoder(file_data):
+def lt_encoder(file_data: bytes, block_size: int):
     """
     LT Encoder generator function.
     The value num_blocks is computed once and yielded with every packet
     for convenience, but must be treated as a constant.
     """
-    num_blocks, block_size = choose_block_size(len(file_data), MAX_PAYLOAD_SIZE)
+    num_blocks = math.ceil(len(file_data) / block_size)
 
     blocks = [
         file_data[i * block_size:(i + 1) * block_size]
@@ -179,8 +179,7 @@ def lt_encoder(file_data):
             block = blocks[idx].ljust(block_size, b'\x00')
             packet = bytes(a ^ b for a, b in zip(packet, block))
 
-        # num_blocks is constant across all yields
-        yield (indices, packet), num_blocks
+        yield indices, packet
 
 class LTDecoder:
     """

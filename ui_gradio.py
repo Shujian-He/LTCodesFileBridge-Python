@@ -17,7 +17,7 @@ MAX_FILE_SIZE = 9785888  # max file size we can handle in bytes
 # 1106 * 8848 = 9785888 bytes
 
 # Put every useful function here to ensure single-file execution
-def robust_soliton_distribution(k, c=0.1, delta=0.5):
+def robust_soliton_distribution(k: int, c: float = 0.1, delta: float = 0.5):
     """
     Compute the Robust Soliton Distribution as defined in:
     M. Luby, "LT Codes", The 43rd Annual IEEE Symposium on Foundations
@@ -98,7 +98,7 @@ def robust_soliton_distribution(k, c=0.1, delta=0.5):
     return mu
 
 
-def choose_degree(mu):
+def choose_degree(mu: list):
     """
     Sample a degree according to the Robust Soliton distribution.
 
@@ -139,28 +139,34 @@ def validate_params(data_length: int, block_size: int):
     return num_blocks
 
 
-def lt_encoder_web(data: bytes, block_size: int):
+def lt_encoder(file_data: bytes, block_size: int):
     """
-    LT Encoder generator function for web UI.
+    LT Encoder generator function.
+    The value num_blocks is computed once and yielded with every packet
+    for convenience, but must be treated as a constant.
     """
-    num_blocks = math.ceil(len(data) / block_size)
-    blocks = [data[i * block_size:(i + 1) * block_size] for i in range(num_blocks)]
+    num_blocks = math.ceil(len(file_data) / block_size)
+
+    blocks = [
+        file_data[i * block_size:(i + 1) * block_size]
+        for i in range(num_blocks)
+    ]
 
     mu = robust_soliton_distribution(num_blocks)
 
     while True:
         d = choose_degree(mu)
         indices = random.sample(range(num_blocks), d)
-        
+
         packet = bytearray(blocks[indices[0]].ljust(block_size, b'\x00'))
         for idx in indices[1:]:
             block = blocks[idx].ljust(block_size, b'\x00')
             packet = bytes(a ^ b for a, b in zip(packet, block))
-        
+
         yield indices, packet
 
 
-def encode_packet_with_bitmask_web(indices, packet, num_blocks):
+def encode_packet_with_bitmask_web(indices: list, packet: bytes, num_blocks: int):
     """
     Convert a list of indices into a bitmask of length num_blocks / 8.
     Use big-endian byte order for better human readability.
@@ -195,7 +201,7 @@ def create_qr_web(data: str):
 
 # ---------------- Gradio UI logic ----------------
 
-def prepare(file_path, block_size):
+def prepare(file_path: str, block_size: int):
     # --- MODIFIED: file handling ---
     file_name = os.path.basename(file_path)
 
@@ -212,7 +218,7 @@ def prepare(file_path, block_size):
     header_qr = create_qr_web(meta_str)
 
     # --- MODIFIED: encoder uses raw bytes ---
-    encoder = lt_encoder_web(raw, block_size)
+    encoder = lt_encoder(raw, block_size)
 
     # --- MODIFIED: return FULL state ---
     state = {

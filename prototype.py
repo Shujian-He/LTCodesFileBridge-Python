@@ -12,18 +12,21 @@ The prototype shows:
 4. Verification that the decoded data matches the original
 """
 
-from tools import lt_encoder, LTDecoder
+from tools import lt_encoder, LTDecoder, choose_block_size, MAX_PAYLOAD_SIZE
+import math
 
 if __name__ == '__main__':
 
-    filename = "output.txt"
-    with open(filename, "rb") as f:
+    file_name = "output.txt"
+    with open(file_name, "rb") as f:
         original_data = f.read()
 
-    encoder_gen = lt_encoder(original_data)
-
-    (indices, pkt), num_blocks = next(encoder_gen)
+    block_size = choose_block_size(len(original_data), MAX_PAYLOAD_SIZE)
+    num_blocks = math.ceil(len(original_data) / block_size)
     print(f"num_blocks = {num_blocks}")
+    
+    encoder_gen = lt_encoder(original_data, block_size)
+    indices, pkt = next(encoder_gen)
 
     decoder = LTDecoder(num_blocks)
     decoder.add_packet(indices, pkt)
@@ -31,8 +34,7 @@ if __name__ == '__main__':
     count = 1
 
     while not decoder.is_complete():
-        (indices, pkt), _ = next(encoder_gen)
-
+        indices, pkt = next(encoder_gen)
         decoder.add_packet(indices, pkt)
         count += 1
 
@@ -42,7 +44,7 @@ if __name__ == '__main__':
     decoded_data = b''.join(decoder.recovered[i] for i in range(num_blocks))
     decoded_data = decoded_data[:len(original_data)]
 
-    with open(f"output/{filename}", "wb") as f:
+    with open(f"output/{file_name}", "wb") as f:
         f.write(decoded_data)
 
 
