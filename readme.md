@@ -4,10 +4,10 @@ A Python implementation of LT Codes for reliable file transmission over QR codes
 
 ## Features
 
-- **LT Encoding/Decoding**: Implements LT codes with robust Soliton distribution for efficient fountain coding.
-- **QR Code Generation**: Converts encoded packets into QR codes for easy transmission.
-- **File Reconstruction**: Decodes received QR packets back into the original file.
-- **Web UI**: Provides Gradio web interfaces for interactive use.
+- **Fountain Coding**: LT codes enable reliable file transfer, provide flexibility against packet loss and eliminate the need for retransmission
+- **QR Code Streaming**: Real-time generation and display of QR codes containing encoded data packets
+- **Loss Tolerant**: Successfully decodes files even when some QR codes are missed or corrupted during transmission
+- **Web-Based Interface**: User-friendly Gradio UI for file selection and QR code generation without command-line usage
 
 ## Installation
 
@@ -26,14 +26,14 @@ A Python implementation of LT Codes for reliable file transmission over QR codes
 
 ## Usage
 
-### Encoder using Gradio UI (Recommended)
+### Encoder using Gradio web interface (Recommended)
 
-Run the Gradio-based interface:
+Run the Gradio web interface:
 ```bash
 gradio ui_gradio.py
 ```
 
-This launches a web interface where you can:
+This launches the web interface where you can:
 - Upload a file
 - Adjust chunk size and QR generation rate
 - Generate and display header and packet QR codes
