@@ -80,8 +80,11 @@ if __name__ == '__main__':
     meta_str = f"HEADER:{filename}:{filesize}:{num_blocks}:{block_size}"
 
     # 1. Show header QR code.
+    header_img = create_qr(meta_str, version=1)
+    # header_img.save("qrcodes/0.png")
+
     plt.figure("Initial Image", figsize=(10, 8))
-    plt.imshow(create_qr(meta_str, version=1), cmap='gray')
+    plt.imshow(header_img, cmap='gray')
     plt.axis('off')
     plt.show()
     
@@ -91,6 +94,7 @@ if __name__ == '__main__':
     plt.ion()  # Enable interactive mode
     fig, ax = plt.subplots(figsize=(10, 8))
 
+    packet_id = 1
     # Infinite loop: show each new packet as a QR code.
     while True:
         indices, packet = next(encoder_gen)
@@ -99,8 +103,12 @@ if __name__ == '__main__':
         b64_data = encode_packet_with_bitmask(indices, packet, num_blocks)
         print(len(b64_data))
         
+        img = create_qr(b64_data)
+        # img.save(f"qrcodes/{packet_id}.png")
+        packet_id += 1
+        
         ax.clear()
-        ax.imshow(create_qr(b64_data), cmap='gray')
+        ax.imshow(img, cmap='gray')
         plt.axis('off')
         plt.draw()
         plt.pause(0.1)
