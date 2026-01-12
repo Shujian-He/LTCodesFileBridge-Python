@@ -12,10 +12,16 @@ The prototype shows:
 4. Verification that the decoded data matches the original
 """
 
-from tools import lt_encoder, LTDecoder, choose_block_size, MAX_PAYLOAD_SIZE
+from tools import lt_encoder, LTDecoder, choose_block_size
 import math
 
+# unlike in qr code transmission, we can use any payload size here for demonstration
+# we can set different sizes to see how it affects performance
+MAX_PAYLOAD_SIZE = 1024
+
 if __name__ == '__main__':
+
+    # --------- Encoding ---------
 
     # Read original file
     file_name = "output.txt"
@@ -25,11 +31,14 @@ if __name__ == '__main__':
     # Determine block size and number of blocks
     block_size = choose_block_size(len(original_data), MAX_PAYLOAD_SIZE)
     num_blocks = math.ceil(len(original_data) / block_size)
-    print(f"num_blocks = {num_blocks}")
+    bitmask_size = math.ceil(num_blocks / 8)
+    print(f"block_size = {block_size}, num_blocks = {num_blocks}, bitmask_size = {bitmask_size}")
     
     # Initialize LT encoder and generate first packet
     encoder_gen = lt_encoder(original_data, block_size)
     indices, pkt = next(encoder_gen)
+
+    # --------- Decoding ---------
 
     # Initialize LT decoder and add first packet
     decoder = LTDecoder(num_blocks)

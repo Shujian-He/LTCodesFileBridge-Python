@@ -148,9 +148,9 @@ def choose_block_size(file_size: int, max_payload_size: int):
 
     for block_size in range(max_payload_size - 1, 0, -1):
         num_blocks = math.ceil(file_size / block_size)
-        bitmask_bytes = math.ceil(num_blocks / 8)
+        bitmask_size = math.ceil(num_blocks / 8)
 
-        if bitmask_bytes + block_size <= max_payload_size:
+        if bitmask_size + block_size <= max_payload_size:
             return block_size
 
     raise ValueError("Cannot find a valid block size")
