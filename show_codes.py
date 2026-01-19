@@ -19,10 +19,9 @@ Functions:
 """
 
 import qrcode
-import base64
 import matplotlib.pyplot as plt
 import math
-from tools import choose_block_size, lt_encoder, MAX_PAYLOAD_SIZE
+from tools import choose_block_size, encode_packet_with_bitmask, lt_encoder, MAX_PAYLOAD_SIZE
 
 def create_qr(data_str: str, version=40):
     """
@@ -40,31 +39,10 @@ def create_qr(data_str: str, version=40):
 
     return img
 
-def indices_to_bitmask(indices: list, num_blocks: int):
-    """
-    Convert a list of indices into a bitmask of length num_blocks / 8.
-    Use big-endian byte order for better human readability.
-    """
-    bitmask = bytearray(math.ceil(num_blocks / 8))
-    for i in indices:
-        bitmask[i // 8] |= 1 << (i % 8)
-    bitmask.reverse()
-    return bytes(bitmask)
-
-def encode_packet_with_bitmask(indices: list, packet: bytes, num_blocks: int):
-    """
-    Combine indices bitmask and the packet data.
-    Returns a Base64 string suitable for embedding in a QR code.
-    """
-    bitmask = indices_to_bitmask(indices, num_blocks)
-    print(' '.join(f'{byte:08b}' for byte in bitmask))
-    combined = bitmask + packet
-    return base64.b64encode(combined).decode('utf-8')
-
 # --- Main Demonstration ---
 if __name__ == '__main__':
-    pass
-    filename = "output.txt"
+
+    filename = "a.jpg"
     with open(filename, "rb") as f:
         original_data = f.read()
     

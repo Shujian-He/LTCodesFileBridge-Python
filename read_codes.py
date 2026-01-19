@@ -9,13 +9,11 @@ The module includes functions to:
 - Process a sequence of QR codes to reconstruct the original file
 """
 
-import base64
-import math
 import os
 from PIL import Image
 import pyzbar.pyzbar as pyzbar
 from pyzbar.pyzbar import ZBarSymbol
-from tools import LTDecoder
+from tools import decode_packet_with_bitmask, LTDecoder
 
 def decode_qr_code_pyzbar(qr_path: str):
     """
@@ -28,43 +26,6 @@ def decode_qr_code_pyzbar(qr_path: str):
         return None
 
     return decoded_objects[0].data
-
-
-def bitmask_to_indices(bitmask: bytes, num_blocks: int):
-    """
-    Convert a bitmask (big-endian byte order) into block indices.
-    """
-    indices = []
-    idx = 0
-
-    for byte in reversed(bitmask):
-        for bit in range(8):
-            if idx >= num_blocks:
-                return indices
-            if byte & (1 << bit):
-                indices.append(idx)
-            idx += 1
-
-    return indices
-
-
-def decode_packet_with_bitmask(encoded_str: str, num_blocks: int):
-    """
-    Decode one LT packet from a base64 encoded string to this form:
-        [bitmask][payload]
-    and extract the indices and packet data.
-
-    Returns:
-        indices : list[int]
-        packet  : bytes
-    """
-    combined = base64.b64decode(encoded_str)
-    num_bytes = math.ceil(num_blocks / 8)
-    bitmask = combined[0:num_bytes]
-    indices = bitmask_to_indices(bitmask, num_blocks)
-    packet = combined[num_bytes:]
-
-    return indices, packet
 
 if __name__ == "__main__":
 

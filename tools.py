@@ -23,6 +23,7 @@ Classes:
     LTDecoder: Incremental peeling decoder for recovering original data
 """
 
+import base64
 import math
 import random
 from collections import deque, defaultdict
@@ -154,6 +155,55 @@ def choose_block_size(file_size: int, max_payload_size: int):
             return block_size
 
     raise ValueError("Cannot find a valid block size")
+
+def encode_packet_with_bitmask(indices: list, packet: bytes, num_blocks: int):
+    """
+    Convert a list of indices into a bitmask of length num_blocks / 8.
+    Use big-endian byte order for better human readability.
+    Combine indices bitmask and the packet data.
+    Returns a Base64 string suitable for embedding in a QR code.
+    """
+    bitmask = bytearray(math.ceil(num_blocks / 8))
+    for i in indices:
+        bitmask[i // 8] |= 1 << (i % 8)
+    bitmask.reverse()
+    combined = bitmask + packet
+    return base64.b64encode(combined).decode('utf-8')
+
+def bitmask_to_indices(bitmask: bytes, num_blocks: int):
+    """
+    Convert a bitmask (big-endian byte order) into block indices.
+    """
+    indices = []
+    idx = 0
+
+    for byte in reversed(bitmask):
+        for bit in range(8):
+            if idx >= num_blocks:
+                return indices
+            if byte & (1 << bit):
+                indices.append(idx)
+            idx += 1
+
+    return indices
+
+def decode_packet_with_bitmask(encoded_str: str, num_blocks: int):
+    """
+    Decode one LT packet from a base64 encoded string to this form:
+        [bitmask][payload]
+    and extract the indices and packet data.
+
+    Returns:
+        indices : list[int]
+        packet  : bytes
+    """
+    combined = base64.b64decode(encoded_str)
+    num_bytes = math.ceil(num_blocks / 8)
+    bitmask = combined[0:num_bytes]
+    indices = bitmask_to_indices(bitmask, num_blocks)
+    packet = combined[num_bytes:]
+
+    return indices, packet
 
 def lt_encoder(file_data: bytes, block_size: int):
     """
